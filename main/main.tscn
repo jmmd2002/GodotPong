@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://baqfurtkqpch"]
+
+[ext_resource type="Script" uid="uid://kyu4u75ahx4v" path="res://main/main.gd" id="1_1y0gn"]
+[ext_resource type="PackedScene" uid="uid://bfk852q0il11g" path="res://paddle/Paddle.tscn" id="2_4eyng"]
+
+[node name="Main" type="Node2D" unique_id=328849026]
+script = ExtResource("1_1y0gn")
+
+[node name="Paddle" parent="." unique_id=1503978725 instance=ExtResource("2_4eyng")]
+position = Vector2(-1, -1)
