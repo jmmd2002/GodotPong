@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://dkx784wjkt6ne"]
+
+[ext_resource type="Script" uid="uid://b52whqr0v40f1" path="res://scenes/wall/wall.gd" id="1_t8knd"]
+
+[node name="Wall" type="StaticBody2D" unique_id=454358827]
+script = ExtResource("1_t8knd")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=348009718]
+offset_right = 100.0
+offset_bottom = 100.0
+pivot_offset = Vector2(0, 20)
+color = Color(0, 0, 0, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1956639450]
