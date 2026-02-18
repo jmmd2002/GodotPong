@@ -16,4 +16,5 @@ func _initialize():
 	$ColorRect.size = size
 
 func _ready():
+	add_to_group("wall")
 	_initialize()

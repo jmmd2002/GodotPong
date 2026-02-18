@@ -13,7 +13,12 @@ config_version=5
 config/name="Pong"
 run/main_scene="uid://baqfurtkqpch"
 config/features=PackedStringArray("4.6", "Forward Plus")
+run/load_shell_environment=true
 config/icon="res://icon.svg"
+
+[autoload]
+
+Utils="*uid://beye63nov8pni"
 
 [input]
 
