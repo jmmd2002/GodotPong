@@ -6,18 +6,6 @@ extends Node2D
 
 var velocity: Vector2 = Vector2(0.0,0.0)
 
-func _reset_ball():
-	# Set size and collision mask
-	var ball_size: Vector2 = Vector2(ball_radius*2, ball_radius*2)
-	var ball_mask: Shape2D = CircleShape2D.new()
-	ball_mask.radius = ball_radius
-	
-	# Set size and collision mask
-	$Sprite2D.scale = ball_size / $Sprite2D.texture.get_size()
-	$CollisionShape2D.shape = ball_mask
-	global_position = get_viewport_rect().size / 2
-	velocity = Vector2.ZERO
-	
 func _ready():
 	
 	_reset_ball() # start in the center of the screen
@@ -30,6 +18,18 @@ func _physics_process(delta):
 	# Move the ball manually
 	position += velocity * delta
 	return
+	
+func _reset_ball():
+	# Set size and collision mask
+	var ball_size: Vector2 = Vector2(ball_radius*2, ball_radius*2)
+	var ball_mask: Shape2D = CircleShape2D.new()
+	ball_mask.radius = ball_radius
+	
+	# Set size and collision mask
+	$Sprite2D.scale = ball_size / $Sprite2D.texture.get_size()
+	$CollisionShape2D.shape = ball_mask
+	global_position = get_viewport_rect().size / 2
+	velocity = Vector2.ZERO
 	
 func launch_ball() -> void:
 	# Random angle, but not too vertical
