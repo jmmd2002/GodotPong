@@ -1,3 +1,11 @@
 [gd_scene format=3 uid="uid://wflxblx6e3dv"]
 
+[ext_resource type="Script" uid="uid://xnj2f2w7m2t8" path="res://game/scoring/kill_zone.gd" id="1_8tk0i"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_vitx1"]
+
 [node name="KillZone" type="Area2D" unique_id=1543180863]
+script = ExtResource("1_8tk0i")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1672824830]
+shape = SubResource("RectangleShape2D_vitx1")

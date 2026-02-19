@@ -5,9 +5,11 @@
 [ext_resource type="PackedScene" uid="uid://c2ppdjcbb0p3d" path="res://game/paddle/paddleB.tscn" id="3_xwkvk"]
 [ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="4_c651c"]
 [ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="5_3wy1v"]
+[ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/scoring/kill_zone.tscn" id="6_yymkh"]
 
 [node name="Main" type="Node2D" unique_id=328849026]
 script = ExtResource("1_1y0gn")
+ball_scene = ExtResource("5_3wy1v")
 
 [node name="PaddleA" parent="." unique_id=1503978725 instance=ExtResource("2_4eyng")]
 position = Vector2(-66, 20)
@@ -23,3 +25,10 @@ position = Vector2(36, 122)
 
 [node name="Ball" parent="." unique_id=151597918 instance=ExtResource("5_3wy1v")]
 position = Vector2(87, 15)
+
+[node name="KillZoneA" parent="." unique_id=1543180863 instance=ExtResource("6_yymkh")]
+position = Vector2(-99, 22)
+
+[node name="KillZoneB" parent="." unique_id=1239048491 instance=ExtResource("6_yymkh")]
+position = Vector2(285, 27)
+side = 1

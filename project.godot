@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 Utils="*uid://beye63nov8pni"
+Dispatcher="*uid://00eccg0y1xou"
 
 [input]
 
