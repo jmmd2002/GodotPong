@@ -22,6 +22,9 @@ func _ready():
 func _physics_process(delta):
 	var dir: int = get_direction()
 	velocity.y = dir * speed
+	
+	handle_collisions()
+	
 	position += velocity * delta
 	
 func get_direction() -> int:

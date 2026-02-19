@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://c2ppdjcbb0p3d"]
 
-[ext_resource type="Script" uid="uid://byn2lflbalx3y" path="res://scenes/paddle/paddleB.gd" id="1_ul20x"]
+[ext_resource type="Script" uid="uid://byn2lflbalx3y" path="res://game/paddle/paddleB.gd" id="1_ul20x"]
 [ext_resource type="Texture2D" uid="uid://cph5j5o1iscct" path="res://assets/spr_paddle.png" id="2_sk16a"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_qhna0"]
