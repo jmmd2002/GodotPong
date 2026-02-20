@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://kyu4u75ahx4v" path="res://game/main/main.gd" id="1_1y0gn"]
 [ext_resource type="PackedScene" uid="uid://bfk852q0il11g" path="res://game/paddle/paddleA.tscn" id="2_4eyng"]
+[ext_resource type="PackedScene" uid="uid://cvucmw8g7xtid" path="res://UI/GUI.tscn" id="3_sifka"]
 [ext_resource type="PackedScene" uid="uid://c2ppdjcbb0p3d" path="res://game/paddle/paddleB.tscn" id="3_xwkvk"]
 [ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="4_c651c"]
 [ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="5_3wy1v"]
@@ -33,3 +34,5 @@ side = "left"
 [node name="KillZoneB" parent="." unique_id=1239048491 instance=ExtResource("6_yymkh")]
 position = Vector2(285, 27)
 side = "right"
+
+[node name="CanvasLayer" parent="." unique_id=920412319 instance=ExtResource("3_sifka")]

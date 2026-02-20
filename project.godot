@@ -22,6 +22,13 @@ Utils="*uid://beye63nov8pni"
 Dispatcher="*uid://00eccg0y1xou"
 GameManager="*uid://kpskowpekiwr"
 
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/size/mode=2
+window/stretch/mode="canvas_items"
+
 [input]
 
 move_up_B={

@@ -1,18 +1,21 @@
 extends Node
 
-var score_left: float = 0
-var score_right: float = 0
+signal score_changed(score_left: int, score_right: int)
 
-# Called when the node enters the scene tree for the first time.
+var score_left: int = 0
+var score_right: int = 0
+
 func _ready() -> void:
 	Dispatcher.scored.connect(_on_scored)
 	return
 
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
 func _on_scored(side: String) -> void:
 	if side == "left":
 		score_left += 1
-	if side == "right":
+	elif side == "right":
 		score_right += 1
+	else:
+		print("Error: scored on unknown side.")
+		
+	emit_signal("score_changed", score_left, score_right)
 	return

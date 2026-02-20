@@ -1,6 +1,6 @@
 extends StaticBody2D
 
-@export var thickness: float = 60.0
+@export var thickness: float = 20.0
 @onready var viewport_size: Vector2 = get_viewport_rect().size
 
 func _initialize():
