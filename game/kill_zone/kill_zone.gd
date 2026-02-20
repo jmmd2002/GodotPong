@@ -1,8 +1,6 @@
 extends Area2D
 
-signal ball_destroyed
-
-@export var side: int = -1 #-1 for left 1 for right
+@export var side: String
 @export var thickness: float = 40.0
 @onready var viewport_size: Vector2 = get_viewport_rect().size
 
@@ -26,6 +24,7 @@ func _handle_collisions() -> void:
 	if ball:
 		ball.queue_free()
 		Dispatcher.emit_ball_destroyed()
+		Dispatcher.emit_scored(side)
 	
 	
 func _check_ball_collision() -> Node:

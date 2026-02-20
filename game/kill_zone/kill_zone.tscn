@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://wflxblx6e3dv"]
 
-[ext_resource type="Script" uid="uid://xnj2f2w7m2t8" path="res://game/scoring/kill_zone.gd" id="1_8tk0i"]
+[ext_resource type="Script" uid="uid://xnj2f2w7m2t8" path="res://game/kill_zone/kill_zone.gd" id="1_8tk0i"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_vitx1"]
 
