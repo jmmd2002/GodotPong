@@ -12,6 +12,9 @@
 script = ExtResource("1_1y0gn")
 ball_scene = ExtResource("5_3wy1v")
 
+[node name="CanvasLayer" parent="." unique_id=920412319 instance=ExtResource("3_sifka")]
+layer = -1
+
 [node name="PaddleA" parent="." unique_id=1503978725 instance=ExtResource("2_4eyng")]
 position = Vector2(-66, 20)
 
@@ -34,5 +37,3 @@ side = "left"
 [node name="KillZoneB" parent="." unique_id=1239048491 instance=ExtResource("6_yymkh")]
 position = Vector2(285, 27)
 side = "right"
-
-[node name="CanvasLayer" parent="." unique_id=920412319 instance=ExtResource("3_sifka")]

@@ -9,7 +9,7 @@ func _ready():
 	var px_size: float = 200
 	label_left.position = Vector2(viewport_size.x/4-label_left.get_size().x/2, viewport_size.y/2- label_left.get_size().y/2)
 	label_right.position = Vector2(3*viewport_size.x/4-label_right.get_size().x/2, viewport_size.y/2 - label_right.get_size().y/2)
-	label_middle.position = Vector2(viewport_size.x/2-label_middle.get_size().x/2, viewport_size.y/2-label_middle.get_size().y/2-100)
+	label_middle.position = Vector2(viewport_size.x/2-label_middle.get_size().x/2, viewport_size.y/2-label_middle.get_size().y/2)
 	#label_middle.text = "-"
 	
 	# initialize UI with current score and make it change whenever score updates
