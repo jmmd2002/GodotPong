@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://cvucmw8g7xtid"]
+
+[ext_resource type="Script" uid="uid://b5pj3bnhslp0n" path="res://UI/GUI/display_scores.gd" id="1_rijmb"]
+[ext_resource type="FontFile" uid="uid://dnvrai1uy21tu" path="res://assets/fonts/joystix monospace.otf" id="2_rs74j"]
+
+[node name="CanvasLayer" type="CanvasLayer" unique_id=977288986]
+
+[node name="ScoreDisplay" type="Control" parent="." unique_id=142641930]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("1_rijmb")
+
+[node name="LabelLeft" type="Label" parent="ScoreDisplay" unique_id=2031485021]
+layout_mode = 1
+offset_right = 1.0
+offset_bottom = 360.0
+theme_override_colors/font_color = Color(0.31870702, 0.5500118, 0.20321849, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_fonts/font = ExtResource("2_rs74j")
+theme_override_font_sizes/font_size = 200
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LabelRight" type="Label" parent="ScoreDisplay" unique_id=1917136736]
+layout_mode = 0
+offset_right = 1.0
+offset_bottom = 304.0
+theme_override_colors/font_color = Color(0.31764707, 0.54901963, 0.20392157, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_fonts/font = ExtResource("2_rs74j")
+theme_override_font_sizes/font_size = 200
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LabelMiddle" type="Label" parent="ScoreDisplay" unique_id=497664192]
+layout_mode = 1
+offset_right = 1.0
+offset_bottom = 304.0
+theme_override_colors/font_color = Color(0.31764707, 0.54901963, 0.20392157, 1)
+theme_override_fonts/font = ExtResource("2_rs74j")
+theme_override_font_sizes/font_size = 200
+horizontal_alignment = 1
+vertical_alignment = 1
