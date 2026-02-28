@@ -10,8 +10,8 @@ var game_path: String = "res://game/game/game.tscn"
 
 func _ready():
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var big_spacing: int = 50
-	var small_spacing: int = 20
+	var big_spacing: float = 50
+	var small_spacing: float = 20
 	
 	label.text = "PONG"
 	label.position = Vector2(viewport_size.x/2-label.size.x/2, viewport_size.y/6-label.size.y/2)
