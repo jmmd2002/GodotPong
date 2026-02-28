@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/kill_zone/kill_zone.tscn" id="7_fneed"]
 [ext_resource type="PackedScene" uid="uid://bklohefig8pcl" path="res://data/data_collector.tscn" id="8_wmtbk"]
 
-[node name="Main" type="Node2D" unique_id=328849026]
+[node name="Game" type="Node2D" unique_id=328849026]
 script = ExtResource("1_gsnfh")
 ball_scene = ExtResource("2_wmtbk")
 
@@ -40,4 +40,4 @@ position = Vector2(285, 27)
 side = "right"
 
 [node name="DataCollector" parent="." unique_id=1795609433 instance=ExtResource("8_wmtbk")]
-position = Vector2(-64, -86)
+position = Vector2(-188, 145)
