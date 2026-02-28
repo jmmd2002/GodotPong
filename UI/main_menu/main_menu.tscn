@@ -2,48 +2,57 @@
 
 [ext_resource type="FontFile" uid="uid://bgrqpo3p2y0eu" path="res://assets/fonts/ARCADECLASSIC.TTF" id="1_bxyur"]
 [ext_resource type="Script" uid="uid://bry2ysp64m7vm" path="res://UI/main_menu/main_menu.gd" id="1_osatk"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_osatk"]
-bg_color = Color(0.6784314, 0.6039216, 0, 1)
+[ext_resource type="FontFile" uid="uid://dnvrai1uy21tu" path="res://assets/fonts/joystix monospace.otf" id="2_1xao8"]
 
 [node name="MainMenu" type="Control" unique_id=690549956]
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_osatk")
 
-[node name="CenterContainer" type="CenterContainer" parent="." unique_id=130671338]
+[node name="Pong" type="Label" parent="." unique_id=621688640]
+layout_direction = 1
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_right = 80.0
-offset_bottom = 74.0
+offset_left = -40.0
+offset_top = -60.0
+offset_right = 40.0
+offset_bottom = 60.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_fonts/font = ExtResource("2_1xao8")
+theme_override_font_sizes/font_size = 100
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=1658211850]
-layout_mode = 2
-alignment = 1
-
-[node name="Pong" type="Label" parent="CenterContainer/VBoxContainer" unique_id=621688640]
-layout_mode = 2
-
-[node name="LocalPlay" type="Button" parent="CenterContainer/VBoxContainer" unique_id=195628074]
-layout_mode = 2
+[node name="LocalPlay" type="Button" parent="." unique_id=195628074]
+layout_mode = 0
+offset_top = 14.0
+offset_right = 80.0
+offset_bottom = 14.0
 theme_override_fonts/font = ExtResource("1_bxyur")
-theme_override_styles/normal = SubResource("StyleBoxFlat_osatk")
 
-[node name="Host" type="Button" parent="CenterContainer/VBoxContainer" unique_id=453865742]
-layout_mode = 2
+[node name="forIP" type="LineEdit" parent="." unique_id=612688255]
+layout_mode = 0
+offset_top = 28.0
+offset_right = 68.5
+offset_bottom = 59.0
 
-[node name="HBoxContainer" type="HBoxContainer" parent="CenterContainer/VBoxContainer" unique_id=294574895]
-layout_mode = 2
-alignment = 1
+[node name="Join" type="Button" parent="." unique_id=1959042626]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 39.0
+offset_right = 44.0
+offset_bottom = 47.0
+theme_override_fonts/font = ExtResource("2_1xao8")
 
-[node name="forIP" type="LineEdit" parent="CenterContainer/VBoxContainer/HBoxContainer" unique_id=612688255]
-layout_mode = 2
-
-[node name="Join" type="Button" parent="CenterContainer/VBoxContainer/HBoxContainer" unique_id=1959042626]
-layout_mode = 2
+[node name="Host" type="Button" parent="." unique_id=453865742]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 31.0
+offset_right = 44.0
+offset_bottom = 39.0
+theme_override_fonts/font = ExtResource("2_1xao8")
