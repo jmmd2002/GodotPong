@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bklohefig8pcl"]
+
+[ext_resource type="Script" uid="uid://2kikjc0xp1w1" path="res://data/data_collector.gd" id="1_qy18u"]
+
+[node name="DataCollector" type="Node2D" unique_id=1795609433]
+script = ExtResource("1_qy18u")

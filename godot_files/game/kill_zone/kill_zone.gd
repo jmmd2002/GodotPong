@@ -15,7 +15,7 @@ func _initialize() -> void:
 	$CollisionShape2D.shape = mask
 	return
 	
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	_handle_collisions()
 	return
 	

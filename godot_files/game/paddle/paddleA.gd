@@ -27,7 +27,7 @@ func _physics_process(delta):
 	position += velocity * delta
 	
 func get_direction() -> int:
-	var direction: float = 0.0
+	var direction: int = 0
 	
 	if Input.is_action_pressed("move_up_A"):
 		direction -= 1
