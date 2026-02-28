@@ -53,13 +53,15 @@ func handle_collisions() -> void:
 		
 	var paddle: Node = check_paddle_collision()
 	if paddle:
+		#avoid colliding more than once with each paddle in a row
 		if (paddle.position.x < position.x and velocity.x < 0) or (paddle.position.x > position.x and velocity.x > 0):
 			var centre: float = paddle.global_position.y
 			var offset: float = centre - global_position.y
 			var offset_normalized: float = offset / (Utils.get_global_rect(paddle.get_node("CollisionShape2D")).size.y/2)
 			var angle: float = max_angle * offset_normalized
 			var dir: int = 1 if velocity.x < 0 else -1
-		
+			
+			speed *= 1.1 #accelerate ball after collision
 			velocity = dir * Vector2(1.0,0).rotated(-dir * angle) * speed
 	return
 	
