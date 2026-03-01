@@ -4,11 +4,10 @@ extends Node2D
 @export var height: float = 112.0
 @export var width: float = 12.0
 @export var speed : float = 400.0
-@export var ai_mode: bool = true  # Enable AI control
-@export var alignment_threshold: float = 10.0  # How close to ball before stopping
+@export var ai_mode: bool = false  # Enable AI control
 
 var velocity: Vector2  = Vector2(0.0, 0.0)
-var ball: Node2D = null  # Reference to the ball
+var ai_action: String = "STAY"  # Current AI action
 
 func _initialize():
 	var size: Vector2 = Vector2(width, height)
@@ -23,38 +22,24 @@ func _ready():
 	_initialize()
 	
 func _physics_process(delta):
-	# Find ball reference if we don't have it yet
-	if ai_mode and ball == null:
-		var balls = get_tree().get_nodes_in_group("ball")
-		if balls.size() > 0:
-			ball = balls[0]
-			print("PaddleB: Found ball reference")
-	
 	var dir: int = get_direction()
 	velocity.y = dir * speed
 	
 	handle_collisions()
 	
 	position += velocity * delta
-
+	
 func get_direction() -> int:
 	var direction: int = 0
 	
 	if ai_mode:
-		# Simple AI: align paddle's y with ball's y
-		if ball:
-			var y_diff = ball.position.y - position.y
-			
-			# Only move if difference is greater than threshold
-			if abs(y_diff) > alignment_threshold:
-				if y_diff < 0:
-					direction = -1  # Ball is above, move up
-				else:
-					direction = 1   # Ball is below, move down
-			else:
-				direction = 0  # Close enough, stay aligned
-		else:
-			print("PaddleB: ball reference is null!")
+		# AI control
+		if ai_action == "UP":
+			direction = -1
+		elif ai_action == "DOWN":
+			direction = 1
+		elif ai_action == "STAY":
+			direction = 0
 	else:
 		# Human control
 		if Input.is_action_pressed("move_up_B"):
@@ -63,6 +48,10 @@ func get_direction() -> int:
 			direction += 1
 	
 	return direction
+
+func set_ai_action(action: String) -> void:
+	"""Set the AI action for this paddle."""
+	ai_action = action
 	
 	
 #----------------- Collisions --------------------

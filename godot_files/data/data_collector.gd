@@ -8,13 +8,25 @@ var last_action: String = "STAY"
 var next_frame_id: int = 0
 const RECONNECT_INTERVAL: float = 1.0  # seconds
 
+# sparse reward tracking
+var score_left_prev: int = 0
+var score_right_prev: int = 0
+
 #get game objects
 var ball: Node2D
 var paddleA: Node2D
 var paddleB: Node2D
+var game_manager: Node
+
+#normalization values
+@onready var viewport_size: Vector2 = get_viewport().size
+@onready var max_x: float = viewport_size.x
+@onready var max_y: float = viewport_size.y
+@onready var max_speed: float = 3200
 
 func _ready() -> void:
 	print("Connecting to server...")
+	game_manager = GameManager
 
 func _process(delta: float):
 	if not connected:
@@ -40,6 +52,8 @@ func try_connect():
 			connected = true
 			incoming_buffer = ""
 			next_frame_id = 0
+			score_left_prev = game_manager.score_left
+			score_right_prev = game_manager.score_right
 			print("Connected to Python server!")
 		else:
 			print("Connecting...")
@@ -62,6 +76,19 @@ func send_state() -> int:
 		var frame_id: int = next_frame_id
 		next_frame_id += 1
 
+		var prev_reward: float = 0.0
+		var done: bool = false
+		var score_left_current: int = game_manager.score_left
+		var score_right_current: int = game_manager.score_right
+
+		if score_left_current > score_left_prev:
+			prev_reward = 1.0
+		elif score_right_current > score_right_prev:
+			prev_reward = -1.0
+
+		score_left_prev = score_left_current
+		score_right_prev = score_right_current
+
 		var state: Dictionary = {
 			"frame_id": frame_id, #for validation
 			"paddleA_y": paddleA.position.y,
@@ -69,7 +96,9 @@ func send_state() -> int:
 			"ball_x": ball.position.x,
 			"ball_y": ball.position.y,
 			"ball_vx": ball.velocity.x,
-			"ball_vy": ball.velocity.y
+			"ball_vy": ball.velocity.y,
+			"prev_reward": prev_reward,
+			"done": done
 		}
 
 		state = normalize_state(state) #normalize between -1 and 1 for better learning
@@ -79,10 +108,6 @@ func send_state() -> int:
 
 func normalize_state(state: Dictionary) -> Dictionary:
 	'''Normalize state values between -1 and 1'''
-	var viewport_size: Vector2 = get_tree().get_viewport().get_size()
-	var max_y: float = viewport_size.x
-	var max_x: float = viewport_size.y
-	var max_speed: float = 3200
 
 	var paddleA_y: float = (state.get("paddleA_y") - max_y/2) / max_y
 	var paddleB_y: float = (state.get("paddleB_y") - max_y/2) / max_y
@@ -98,7 +123,9 @@ func normalize_state(state: Dictionary) -> Dictionary:
 		"ball_x": ball_x,
 		"ball_y": ball_y,
 		"ball_vx": ball_vx,
-		"ball_vy": ball_vy
+		"ball_vy": ball_vy,
+		"prev_reward": state.get("prev_reward", 0.0),
+		"done": state.get("done", false)
 	}
 	return state
 

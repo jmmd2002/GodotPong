@@ -5,6 +5,9 @@ This agent learns to play Pong using Q-learning with value iteration.
 """
 
 import random
+import ast
+import json
+from pathlib import Path
 
 
 class QLearningAgent:
@@ -20,8 +23,12 @@ class QLearningAgent:
         "ball_vx": 3,
         "ball_vy": 3
     }
+    DEFAULT_ALPHA = 0.1
+    DEFAULT_GAMMA = 0.95
+    DEFAULT_EPSILON = 0.2
 
-    def __init__(self, state=None, bins_config=None, actions=None):
+    def __init__(self, state=None, bins_config=None, actions=None, 
+                 alpha=None, gamma=None, epsilon=None):
         """
         Initialize the Q-learning agent.
         
@@ -34,6 +41,9 @@ class QLearningAgent:
                                  "ball_vx": 3, "ball_vy": 3}
                         If None, uses default configuration.
             actions: List of available action strings. If None, uses default.
+            alpha: Learning rate (0 to 1). Default: 0.1
+            gamma: Discount factor (0 to 1). Default: 0.95
+            epsilon: Exploration rate (0 to 1). Default: 0.2
         """
         # Set state variables
         if state is None:
@@ -52,11 +62,26 @@ class QLearningAgent:
             self.bins_config = self.DEFAULT_BINS_CONFIG
         else:
             self.bins_config = bins_config
+
+        # Learning hyperparameters
+        self.alpha = alpha if alpha is not None else self.DEFAULT_ALPHA      # Learning rate
+        self.gamma = gamma if gamma is not None else self.DEFAULT_GAMMA     # Discount factor
+        self.epsilon = epsilon if epsilon is not None else self.DEFAULT_EPSILON  # Exploration rate
         
         # Validate configuration
         self._validate_state()
         self._validate_actions()
         self._validate_bins()
+        self._validate_hyperparameters()
+        
+        
+        # Initialize Q-table: stores Q-values for (state, action) pairs
+        # Q(s, a) = estimated value of taking action a in state s
+        self.q_table = {}
+        
+        # For tracking the last state and action for learning
+        self._last_state = None
+        self._last_action = None
         
         print("Q-Learning Agent initialized")
         print(f"State variables: {self.state}")
@@ -101,6 +126,26 @@ class QLearningAgent:
         # Check if all values are int or float
         if not all(isinstance(v, (int, float)) for v in self.bins_config.values()):
             raise ValueError("Bin values should be int or float.")
+        
+    def _validate_hyperparameters(self):
+        """
+        Validate that alpha, gamma, and epsilon are in the range [0, 1].
+        Raises ValueError if validation fails.
+        """
+        if not isinstance(self.alpha, (int, float)):
+            raise ValueError("Alpha (learning rate) should be a number.")
+        if not (0 <= self.alpha <= 1):
+            raise ValueError("Alpha (learning rate) should be in the range [0, 1].")
+        
+        if not isinstance(self.gamma, (int, float)):
+            raise ValueError("Gamma (discount factor) should be a number.")
+        if not (0 <= self.gamma <= 1):
+            raise ValueError("Gamma (discount factor) should be in the range [0, 1].")
+        
+        if not isinstance(self.epsilon, (int, float)):
+            raise ValueError("Epsilon (exploration rate) should be a number.")
+        if not (0 <= self.epsilon <= 1):
+            raise ValueError("Epsilon (exploration rate) should be in the range [0, 1].")
     
     @classmethod
     def from_dict(cls: 'QLearningAgent', config_dict: dict):
@@ -109,7 +154,8 @@ class QLearningAgent:
         
         Args:
             config_dict: Dictionary containing configuration parameters.
-                        Expected keys: 'state', 'bins_config', 'actions'
+                        Expected keys: 'state', 'bins_config', 'actions', 'hyperparameters'
+                        hyperparameters should contain: 'alpha', 'gamma', 'epsilon'
         
         Returns:
             QLearningAgent instance configured with the provided parameters.
@@ -118,7 +164,14 @@ class QLearningAgent:
         bins_config = config_dict.get('bins_config', None)
         actions = config_dict.get('actions', None)
         
-        return cls(state=state, bins_config=bins_config, actions=actions)
+        # Extract hyperparameters from config
+        hyperparams: dict = config_dict.get('hyperparameters', {})
+        alpha = hyperparams.get('alpha', 0.1)
+        gamma = hyperparams.get('gamma', 0.95)
+        epsilon = hyperparams.get('epsilon', 0.2)
+        
+        return cls(state=state, bins_config=bins_config, actions=actions,
+                   alpha=alpha, gamma=gamma, epsilon=epsilon)
     
     def _calculate_bin_index(self, normalized_value: float, num_bins: int) -> int:
         """
@@ -212,21 +265,30 @@ class QLearningAgent:
     
     def _choose_action(self, state):
         """
-        Choose an action based on the current state.
+        Choose an action using epsilon-greedy strategy.
         
-        For now, this just chooses randomly (pure exploration).
-        Later we'll add:
-        - Q-table lookup to find best action (exploitation)
-        - Epsilon-greedy strategy (balance explore vs exploit)
+        With probability epsilon: explore (pick random action)
+        With probability (1-epsilon): exploit (pick best known action)
         
         Args:
-            state: Discretized state tuple, e.g., (3, 4, 2, 2, 0)
+            state: Discretized state tuple, e.g., (3, 4, 2, 1, 0, 1)
             
         Returns:
             Action string: "UP", "DOWN", or "STAY"
         """
-        # Right now: completely random action (100% exploration)
-        action = random.choice(self.actions)
+        # Generate random number between 0 and 1
+        if random.random() < self.epsilon:
+            # EXPLORE: Pick a random action
+            action = random.choice(self.actions)
+        else:
+            # EXPLOIT: Pick the action with the highest Q-value in this state
+            q_values = [self.q_table.get((state, a), 0.0) for a in self.actions]
+            max_q = max(q_values)
+            # If multiple actions have same max value, pick one randomly
+            best_actions = [self.actions[i] for i in range(len(self.actions)) 
+                           if q_values[i] == max_q]
+            action = random.choice(best_actions)
+        
         return action
     
     def process_state(self, state_dict: dict[str, float]) -> str:
@@ -234,6 +296,7 @@ class QLearningAgent:
         Main method: receive game state and decide what action to take.
         
         This is the method that gets called every frame by the server.
+        Also remembers this state and action internally for learning later.
         
         Args:
             state_dict: Dictionary from JSON containing raw game state
@@ -251,7 +314,132 @@ class QLearningAgent:
         # Step 2: Choose an action based on that state
         action = self._choose_action(discrete_state)
         
-        # Step 3: Print for debugging (so we can see what it's doing)
+        # Step 3: Remember this state and action for learning when we get feedback
+        self._last_state = discrete_state
+        self._last_action = action
+        
+        # Step 4: Print for debugging (so we can see what it's doing)
         #print(f"State: {discrete_state} -> Action: {action}")
         
         return action
+    
+    def _update_q_value(self, prev_state: tuple, action: str, reward: float, 
+                       state: tuple, done: bool) -> None:
+        """
+        Update a single Q-value using the Bellman equation.
+        
+        This is called after the agent takes an action and receives feedback.
+        It's the core learning algorithm.
+        
+        Args:
+            prev_state: Previous discretized state (tuple of bin indices)
+            action: The action taken at prev_state (string)
+            reward: The reward received from the environment (float)
+            state: The new discretized state after the action (tuple)
+            done: Whether the episode ended (bool)
+        """
+        # Get the current Q-value for this state-action pair
+        # If we haven't seen this pair before, default to 0.0
+        current_q = self.q_table.get((prev_state, action), 0.0)
+        
+        # If the episode is over, there's no future value to consider
+        if done:
+            max_next_q = 0.0
+        else:
+            # Otherwise, find the best Q-value for any action in the next state
+            next_q_values = [self.q_table.get((state, a), 0.0) for a in self.actions]
+            max_next_q = max(next_q_values)
+        
+        # Apply the Bellman equation to update the Q-value
+        # New estimate = old estimate + learning_rate * (immediate_reward + future_value - old_estimate)
+        new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
+        
+        # Store the updated Q-value
+        self.q_table[(prev_state, action)] = new_q
+    
+    def update(self, reward: float, state: dict[str, float], done: bool) -> None:
+        """
+        Simpler learning method that uses internally tracked state/action.
+        
+        Call this every frame with feedback from the previous action.
+        The agent remembers its last state/action from the previous process_state() call.
+        
+        Args:
+            reward: The reward received from the previous action (float)
+            state: Raw game state (the result of where the previous action led)
+            done: Whether the episode ended (bool)
+        """
+        # If this is the first frame, we have no previous action to learn from
+        if self._last_state is None or self._last_action is None:
+            return
+        
+        # Convert next state from continuous to discrete bins
+        state = self._discretize_state(state)
+        
+        # Update Q-value using the action we took last frame
+        self._update_q_value(self._last_state, self._last_action, reward, state, done)
+    
+    def save(self, filepath: str) -> None:
+        """
+        Save learned Q-table to file for later use.
+        
+        Args:
+            filepath: Path where to save the Q-table (JSON format)
+        """
+        # Convert Q-table keys (tuples) to strings for JSON serialization
+        q_table_str_keys = {str(k): v for k, v in self.q_table.items()}
+
+        save_path = Path(filepath)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(save_path, 'w') as f:
+            json.dump(q_table_str_keys, f, indent=2)
+        
+        print(f"Q-table saved to {save_path}")
+    
+    def load(self, filepath: str) -> None:
+        """
+        Load a previously saved Q-table from file.
+        
+        Args:
+            filepath: Path to the saved Q-table file (JSON format)
+        """
+        with open(filepath, 'r') as f:
+            q_table_str_keys = json.load(f)
+        
+        # Convert string keys back to tuples
+        self.q_table = {}
+        for str_key, q_value in q_table_str_keys.items():
+            parsed_key = ast.literal_eval(str_key)
+            self.q_table[parsed_key] = q_value
+        
+        print(f"Q-table loaded from {filepath}")
+    
+    def get_stats(self) -> dict:
+        """
+        Get learning statistics about the current Q-table.
+        
+        Useful for monitoring training progress.
+        
+        Returns:
+            Dictionary containing:
+            - num_entries: Number of (state, action) pairs learned
+            - avg_q: Average Q-value
+            - max_q: Highest Q-value
+            - min_q: Lowest Q-value
+        """
+        if not self.q_table:
+            return {
+                "num_entries": 0,
+                "avg_q": 0.0,
+                "max_q": 0.0,
+                "min_q": 0.0
+            }
+        
+        q_values = list(self.q_table.values())
+        return {
+            "num_entries": len(self.q_table),
+            "avg_q": sum(q_values) / len(q_values),
+            "max_q": max(q_values),
+            "min_q": min(q_values)
+        }

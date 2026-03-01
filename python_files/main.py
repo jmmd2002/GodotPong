@@ -12,8 +12,8 @@ HOST = "127.0.0.1"
 PORT = 5000
 
 
-def load_agent() -> QLearningAgent:
-    """Load Q-learning agent from config file."""
+def load_agent() -> tuple[QLearningAgent, dict]:
+    """Load Q-learning agent and raw config from config file."""
     config_path = QAGENT_CONFIG_PATH
     
     try:
@@ -25,13 +25,28 @@ def load_agent() -> QLearningAgent:
         raise
 
     agent = QLearningAgent.from_dict(config)
-    return agent
+    return agent, config
 
 
 def main():
     """Start the server and handle incoming connections."""
     # Load the Q-learning agent
-    agent = load_agent()
+    agent, config = load_agent()
+
+    model_config: dict = config.get("model", {})
+    model_path = Path(__file__).parent / model_config.get("path", "models/q_table.json")
+    load_on_start: bool = model_config.get("load_on_start", True)
+    save_on_exit: bool = model_config.get("save_on_exit", True)
+    autosave_every_n_steps: int = int(model_config.get("autosave_every_n_steps", 1000))
+    learning_steps: int = 0
+
+    if load_on_start and model_path.exists():
+        try:
+            agent.load(str(model_path))
+        except Exception as e:
+            print(f"Failed to load model from {model_path}: {e}")
+    elif load_on_start:
+        print(f"No existing model found at {model_path}. Starting fresh.")
     
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -44,6 +59,7 @@ def main():
         print(f"Connected by {addr}")
 
         buffer = ""
+        
         while True:
             data = conn.recv(1024)
             if not data:
@@ -51,24 +67,39 @@ def main():
 
             buffer += data.decode()
 
-            while "\n" in buffer: # split messages on new lines - ensure program advances only with valid message
+            while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
                 
                 try:
-                    # Parse incoming state
-                    state_dict: dict[str, float] = json.loads(line)
-                    #print(f"Received state: {state_dict}")
-
-                    frame_id = state_dict.get("frame_id")
+                    # Parse incoming message from Godot
+                    message: dict = json.loads(line)
+                    
+                    frame_id = message.get("frame_id")
                     if frame_id is None:
-                        print("State validation error: missing 'frame_id'")
+                        print("Message validation error: missing 'frame_id'")
                         continue
 
-                    agent_state = dict(state_dict)
-                    agent_state.pop("frame_id", None)
+                    # Extract feedback from previous action
+                    prev_reward = message.get("prev_reward", 0.0)
+                    done = message.get("done", False)
                     
-                    # Get action from agent
-                    action = agent.process_state(agent_state)
+                    # Extract current state (which is the next state from previous action's perspective)
+                    current_state = {k: v for k, v in message.items() 
+                                    if k not in ["frame_id", "prev_reward", "done"]}
+                    
+                    # LEARNING: Update Q-values from previous action
+                    # The agent remembers its last state/action, and current_state is where it ended up
+                    agent.update(prev_reward, current_state, done)
+                    learning_steps += 1
+
+                    if autosave_every_n_steps > 0 and learning_steps % autosave_every_n_steps == 0:
+                        try:
+                            agent.save(str(model_path))
+                        except Exception as e:
+                            print(f"Autosave failed at step {learning_steps}: {e}")
+                    
+                    # DECISION: Get next action from current state
+                    action = agent.process_state(current_state)
                     
                     # Send action back to Godot
                     response = json.dumps({"frame_id": frame_id, "action": action}) + "\n"
@@ -84,7 +115,13 @@ def main():
     except KeyboardInterrupt:
         print("\nShutting down server...")
     finally: #close server
-        conn.close()
+        if save_on_exit:
+            try:
+                agent.save(str(model_path))
+            except Exception as e:
+                print(f"Failed to save model to {model_path}: {e}")
+        if conn is not None:
+            conn.close()
         server.close()
         print("Server closed.")
 
