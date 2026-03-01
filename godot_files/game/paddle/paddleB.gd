@@ -4,8 +4,10 @@ extends Node2D
 @export var height: float = 112.0
 @export var width: float = 12.0
 @export var speed : float = 400.0
+@export var ai_mode: bool = false  # Enable AI control
 
 var velocity: Vector2  = Vector2(0.0, 0.0)
+var ai_action: String = "STAY"  # Current AI action
 
 func _initialize():
 	var size: Vector2 = Vector2(width, height)
@@ -30,11 +32,26 @@ func _physics_process(delta):
 func get_direction() -> int:
 	var direction: int = 0
 	
-	if Input.is_action_pressed("move_up_B"):
-		direction -= 1
-	if Input.is_action_pressed("move_down_B"):
-		direction += 1
+	if ai_mode:
+		# AI control
+		if ai_action == "UP":
+			direction = -1
+		elif ai_action == "DOWN":
+			direction = 1
+		elif ai_action == "STAY":
+			direction = 0
+	else:
+		# Human control
+		if Input.is_action_pressed("move_up_B"):
+			direction -= 1
+		if Input.is_action_pressed("move_down_B"):
+			direction += 1
+	
 	return direction
+
+func set_ai_action(action: String) -> void:
+	"""Set the AI action for this paddle."""
+	ai_action = action
 	
 	
 #----------------- Collisions --------------------

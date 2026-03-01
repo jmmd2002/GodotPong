@@ -3,6 +3,9 @@ extends Node
 var client: StreamPeerTCP = StreamPeerTCP.new()
 var connected: bool = false
 var reconnect_timer: float = 0.0
+var incoming_buffer: String = ""
+var last_action: String = "STAY"
+var next_frame_id: int = 0
 const RECONNECT_INTERVAL: float = 1.0  # seconds
 
 #get game objects
@@ -20,7 +23,14 @@ func _process(delta: float):
 			reconnect_timer = 0
 			try_connect()
 	else:
-		send_state()
+		var sent_frame_id: int = send_state()
+		if sent_frame_id != -1:
+			var action: String = receive_action(sent_frame_id)
+			if not action.is_empty():
+				last_action = action
+				apply_action(last_action)
+			else:
+				print("Warning: No action received. Keeping last action: ", last_action)
 
 func try_connect():
 	var err: Error = client.connect_to_host("127.0.0.1", 5000)
@@ -28,14 +38,16 @@ func try_connect():
 		client.poll() #poll every step for server status
 		if client.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			connected = true
+			incoming_buffer = ""
+			next_frame_id = 0
 			print("Connected to Python server!")
 		else:
-			print("Connecting... still not ready")
+			print("Connecting...")
 	else:
 		client = StreamPeerTCP.new()
 		print("Connection error with value ", err, ". Retrying...")
 
-func send_state():
+func send_state() -> int:
 	
 	for b in get_tree().get_nodes_in_group("ball"):
 		ball = b #currently gets only first ball; needs fixing later
@@ -45,12 +57,14 @@ func send_state():
 	
 	#skip if any of the instances does not exist
 	if ball == null or paddleA == null or paddleB == null:
-		return
+		return -1
 	else:	
+		var frame_id: int = next_frame_id
+		next_frame_id += 1
+
 		var state: Dictionary = {
-			"paddleA_x": paddleA.position.x,
+			"frame_id": frame_id, #for validation
 			"paddleA_y": paddleA.position.y,
-			"paddleB_x": paddleB.position.x,
 			"paddleB_y": paddleB.position.y,
 			"ball_x": ball.position.x,
 			"ball_y": ball.position.y,
@@ -59,5 +73,53 @@ func send_state():
 		}
 		var json: String = JSON.stringify(state) + "\n"
 		client.put_data(json.to_utf8_buffer())
-		print("Sent:", json)
-		return
+		return frame_id
+
+func receive_action(expected_frame_id: int) -> String:
+	"""Block until a newline-terminated action for expected_frame_id is fully received."""
+	while connected:
+		client.poll()
+		if client.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			connected = false
+			print("Disconnected from server. Attempting to reconnect...")
+			client = StreamPeerTCP.new()
+			incoming_buffer = ""
+			return ""
+
+		if client.get_available_bytes() <= 0:
+			continue
+
+		var response_bytes: int = client.get_available_bytes()
+		incoming_buffer += client.get_utf8_string(response_bytes)
+
+		while true:
+			var newline_idx: int = incoming_buffer.find("\n")
+			if newline_idx == -1:
+				break
+
+			var message: String = incoming_buffer.substr(0, newline_idx).strip_edges()
+			incoming_buffer = incoming_buffer.substr(newline_idx + 1)
+
+			if message.is_empty():
+				continue
+
+			var json_parser: JSON = JSON.new()
+			var error: int = json_parser.parse(message)
+
+			if error == OK:
+				var action_data: Dictionary = json_parser.data
+				if action_data.has("frame_id") and action_data.has("action"):
+					var received_frame_id: int = int(action_data["frame_id"])
+					if received_frame_id == expected_frame_id: #validate server data mismatch
+						return str(action_data["action"])
+					print("Warning: Frame mismatch. Expected ", expected_frame_id, ", got ", received_frame_id)
+				else:
+					print("Warning: Received JSON missing 'frame_id' or 'action': ", action_data)
+			else:
+				print("JSON Parse Error: ", json_parser.get_error_message())
+	return ""
+
+func apply_action(action: String) -> void:
+	"""Apply the received action to paddleA."""
+	if paddleA != null and paddleA.has_method("set_ai_action"):
+		paddleA.set_ai_action(action)

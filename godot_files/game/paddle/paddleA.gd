@@ -4,8 +4,10 @@ extends Node2D
 @export var height: float = 112.0
 @export var width: float = 12.0
 @export var speed : float = 400.0
+@export var ai_mode: bool = true
 
 var velocity: Vector2  = Vector2(0.0, 0.0)
+var ai_action: String = "STAY"
 
 func _initialize():
 	var size: Vector2 = Vector2(width, height)
@@ -28,12 +30,23 @@ func _physics_process(delta):
 	
 func get_direction() -> int:
 	var direction: int = 0
-	
-	if Input.is_action_pressed("move_up_A"):
-		direction -= 1
-	if Input.is_action_pressed("move_down_A"):
-		direction += 1
+
+	if ai_mode:
+		if ai_action == "UP":
+			direction = -1
+		elif ai_action == "DOWN":
+			direction = 1
+		elif ai_action == "STAY":
+			direction = 0
+	else:
+		if Input.is_action_pressed("move_up_A"):
+			direction -= 1
+		if Input.is_action_pressed("move_down_A"):
+			direction += 1
 	return direction
+
+func set_ai_action(action: String) -> void:
+	ai_action = action
 
 
 #----------------- Collisions --------------------
