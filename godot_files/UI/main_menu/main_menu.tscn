@@ -1,6 +1,5 @@
 [gd_scene format=3 uid="uid://lxovn2ngwhxs"]
 
-[ext_resource type="FontFile" uid="uid://bgrqpo3p2y0eu" path="res://assets/fonts/ARCADECLASSIC.TTF" id="1_bxyur"]
 [ext_resource type="Script" uid="uid://bry2ysp64m7vm" path="res://UI/main_menu/main_menu.gd" id="1_osatk"]
 [ext_resource type="FontFile" uid="uid://dnvrai1uy21tu" path="res://assets/fonts/joystix monospace.otf" id="2_1xao8"]
 
@@ -33,7 +32,8 @@ layout_mode = 0
 offset_top = 14.0
 offset_right = 80.0
 offset_bottom = 14.0
-theme_override_fonts/font = ExtResource("1_bxyur")
+theme_override_fonts/font = ExtResource("2_1xao8")
+theme_override_font_sizes/font_size = 16
 
 [node name="forIP" type="LineEdit" parent="." unique_id=612688255]
 layout_mode = 0

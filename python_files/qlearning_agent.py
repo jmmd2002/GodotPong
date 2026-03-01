@@ -142,12 +142,13 @@ class QLearningAgent:
     def _validate_state_dict(self, state_dict: dict) -> None:
         """
         Validate that state_dict keys match expected state variables.
+        Also validates each value is numeric. Values outside [-1, 1] are clamped.
         
         Args:
             state_dict: Dictionary containing state values
             
         Raises:
-            ValueError: If keys don't match expected state variables
+            ValueError: If keys don't match expected state variables or values are non-numeric
         """
         state_dict_keys = set(state_dict.keys())
         expected_keys = set(self.state)
@@ -161,6 +162,16 @@ class QLearningAgent:
             if extra:
                 error_msg += f" Extra keys: {extra}."
             raise ValueError(error_msg)
+
+        for key in self.state:
+            value = state_dict[key]
+            if not isinstance(value, (int, float)):
+                raise ValueError(f"State value for '{key}' must be numeric, got {type(value).__name__}.")
+            if value < -1.0 or value > 1.0:
+                print(
+                    f"Warning: State value for '{key}' out of range: {value}. Clamping to [-1, 1]."
+                )
+                state_dict[key] = max(min(value, 1.0), -1.0)
     
     def _discretize_state(self, state: dict) -> tuple:
         """

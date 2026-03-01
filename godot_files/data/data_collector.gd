@@ -71,9 +71,36 @@ func send_state() -> int:
 			"ball_vx": ball.velocity.x,
 			"ball_vy": ball.velocity.y
 		}
+
+		state = normalize_state(state) #normalize between -1 and 1 for better learning
 		var json: String = JSON.stringify(state) + "\n"
 		client.put_data(json.to_utf8_buffer())
 		return frame_id
+
+func normalize_state(state: Dictionary) -> Dictionary:
+	'''Normalize state values between -1 and 1'''
+	var viewport_size: Vector2 = get_tree().get_viewport().get_size()
+	var max_y: float = viewport_size.x
+	var max_x: float = viewport_size.y
+	var max_speed: float = 3200
+
+	var paddleA_y: float = (state.get("paddleA_y") - max_y/2) / max_y
+	var paddleB_y: float = (state.get("paddleB_y") - max_y/2) / max_y
+	var ball_x: float = (state.get("ball_x") - max_x/2) / max_x
+	var ball_y: float = (state.get("ball_y") - max_y/2) / max_y
+	var ball_vx: float = state.get("ball_vx") / max_speed
+	var ball_vy: float = state.get("ball_vy") / max_speed
+
+	state = {
+		"frame_id": state.get("frame_id"),
+		"paddleA_y": paddleA_y,
+		"paddleB_y": paddleB_y,
+		"ball_x": ball_x,
+		"ball_y": ball_y,
+		"ball_vx": ball_vx,
+		"ball_vy": ball_vy
+	}
+	return state
 
 func receive_action(expected_frame_id: int) -> String:
 	"""Block until a newline-terminated action for expected_frame_id is fully received."""

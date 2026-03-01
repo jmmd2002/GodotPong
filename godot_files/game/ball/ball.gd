@@ -22,9 +22,9 @@ func _process(delta):
 	
 func _reset_ball():
 	# Set size and collision mask
-	var ball_size: Vector2 = Vector2(ball_radius*2, ball_radius*2)
-	var ball_mask: Shape2D = CircleShape2D.new()
-	ball_mask.radius = ball_radius
+	var ball_size: Vector2 = Vector2(ball_radius*2, ball_radius*2)/2 #make ball smaller
+	var ball_mask: Shape2D = RectangleShape2D.new()
+	ball_mask.size = ball_size
 	
 	# Set size and collision mask
 	$Sprite2D.scale = ball_size / $Sprite2D.texture.get_size()
