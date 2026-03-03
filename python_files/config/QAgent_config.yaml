@@ -1,0 +1,39 @@
+# Q-Learning Agent Configuration
+
+# State variables to track
+state:
+  - paddleA_y
+  - paddleB_y
+  - ball_x
+  - ball_y
+  - ball_vx
+  - ball_vy
+
+# State space discretization
+# Maps each state variable to the number of bins to use
+bins_config:
+  paddleA_y: 8
+  paddleB_y: 8
+  ball_x: 10
+  ball_y: 8
+  ball_vx: 4
+  ball_vy: 4
+
+# Available actions
+actions:
+  - UP
+  - DOWN
+  - STAY
+
+# Learning hyperparameters
+hyperparameters:
+  alpha: 0.1      # Learning rate: how much we update Q-values (0 to 1)
+  gamma: 0.99     # Discount factor: how much we value future rewards (0 to 1)
+  epsilon: 0.2    # Exploration rate: probability of random action (0 to 1)
+
+# Model persistence settings
+model:
+  path: models/q_table.json         # Relative to python_files/
+  load_on_start: true               # Load existing model if file exists
+  save_on_exit: true                # Save model when server shuts down
+  autosave_every_n_steps: 0      # 0 disables autosave during runtime

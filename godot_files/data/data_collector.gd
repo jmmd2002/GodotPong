@@ -82,9 +82,11 @@ func send_state() -> int:
 		var score_right_current: int = game_manager.score_right
 
 		if score_left_current > score_left_prev:
-			prev_reward = 1.0
-		elif score_right_current > score_right_prev:
 			prev_reward = -1.0
+			done = true
+		elif score_right_current > score_right_prev:
+			prev_reward = 1.0
+			done = true
 
 		score_left_prev = score_left_current
 		score_right_prev = score_right_current

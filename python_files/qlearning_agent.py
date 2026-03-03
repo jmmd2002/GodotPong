@@ -83,6 +83,12 @@ class QLearningAgent:
         self._last_state = None
         self._last_action = None
         
+        # For tracking learning progress
+        self._updates_count = 0
+        self._exploration_count = 0
+        self._exploitation_count = 0
+        self._max_q_value = 0.0
+        
         print("Q-Learning Agent initialized")
         print(f"State variables: {self.state}")
         print(f"Available actions: {self.actions}")
@@ -280,6 +286,7 @@ class QLearningAgent:
         if random.random() < self.epsilon:
             # EXPLORE: Pick a random action
             action = random.choice(self.actions)
+            self._exploration_count += 1
         else:
             # EXPLOIT: Pick the action with the highest Q-value in this state
             q_values = [self.q_table.get((state, a), 0.0) for a in self.actions]
@@ -288,6 +295,7 @@ class QLearningAgent:
             best_actions = [self.actions[i] for i in range(len(self.actions)) 
                            if q_values[i] == max_q]
             action = random.choice(best_actions)
+            self._exploitation_count += 1
         
         return action
     
@@ -356,6 +364,11 @@ class QLearningAgent:
         
         # Store the updated Q-value
         self.q_table[(prev_state, action)] = new_q
+        
+        # Track learning progress
+        self._updates_count += 1
+        if new_q > self._max_q_value:
+            self._max_q_value = new_q
     
     def update(self, reward: float, state: dict[str, float], done: bool) -> None:
         """
@@ -427,19 +440,30 @@ class QLearningAgent:
             - avg_q: Average Q-value
             - max_q: Highest Q-value
             - min_q: Lowest Q-value
+            - updates: Total number of Q-value updates
+            - exploration_rate: Percentage of actions that were explorations
         """
         if not self.q_table:
-            return {
+            stats = {
                 "num_entries": 0,
                 "avg_q": 0.0,
                 "max_q": 0.0,
                 "min_q": 0.0
             }
+        else:
+            q_values = list(self.q_table.values())
+            stats = {
+                "num_entries": len(self.q_table),
+                "avg_q": sum(q_values) / len(q_values),
+                "max_q": max(q_values),
+                "min_q": min(q_values)
+            }
         
-        q_values = list(self.q_table.values())
-        return {
-            "num_entries": len(self.q_table),
-            "avg_q": sum(q_values) / len(q_values),
-            "max_q": max(q_values),
-            "min_q": min(q_values)
-        }
+        # Add learning progress stats
+        total_actions = self._exploration_count + self._exploitation_count
+        exploration_pct = (self._exploration_count / total_actions * 100) if total_actions > 0 else 0.0
+        
+        stats["updates"] = self._updates_count
+        stats["exploration_rate"] = exploration_pct
+        
+        return stats

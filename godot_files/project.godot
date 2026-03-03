@@ -23,10 +23,6 @@ Dispatcher="*uid://00eccg0y1xou"
 GameManager="*uid://kpskowpekiwr"
 Global="*uid://dfbhgooyhuwf4"
 
-[debug]
-
-settings/stdout/print_fps=true
-
 [display]
 
 window/size/viewport_width=1280

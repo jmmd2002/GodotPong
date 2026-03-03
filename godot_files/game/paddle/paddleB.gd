@@ -28,7 +28,6 @@ func _physics_process(delta):
 		var balls = get_tree().get_nodes_in_group("ball")
 		if balls.size() > 0:
 			ball = balls[0]
-			print("PaddleB: Found ball reference")
 	
 	var dir: int = get_direction()
 	velocity.y = dir * speed
@@ -53,8 +52,7 @@ func get_direction() -> int:
 					direction = 1   # Ball is below, move down
 			else:
 				direction = 0  # Close enough, stay aligned
-		else:
-			print("PaddleB: ball reference is null!")
+		# no ball reference, stay still
 	else:
 		# Human control
 		if Input.is_action_pressed("move_up_B"):
