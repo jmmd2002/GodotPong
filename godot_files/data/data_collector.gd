@@ -11,6 +11,7 @@ const RECONNECT_INTERVAL: float = 1.0  # seconds
 # sparse reward tracking
 var score_left_prev: int = 0
 var score_right_prev: int = 0
+var prev_ball_vx: float = 0.0
 
 #get game objects
 var ball: Node2D
@@ -82,12 +83,15 @@ func send_state() -> int:
 		var score_right_current: int = game_manager.score_right
 
 		if score_left_current > score_left_prev:
-			prev_reward = -1.0
-			done = true
-		elif score_right_current > score_right_prev:
 			prev_reward = 1.0
 			done = true
+		elif score_right_current > score_right_prev:
+			prev_reward = -1.0
+			done = true
+		elif prev_ball_vx < 0.0 and ball.velocity.x > 0.0:
+			prev_reward = 0.1  # PaddleA hit the ball
 
+		prev_ball_vx = ball.velocity.x
 		score_left_prev = score_left_current
 		score_right_prev = score_right_current
 

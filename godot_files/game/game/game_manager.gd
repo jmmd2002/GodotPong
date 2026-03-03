@@ -11,9 +11,9 @@ func _ready() -> void:
 
 func _on_scored(side: String) -> void:
 	if side == "left":
-		score_left += 1
-	elif side == "right":
 		score_right += 1
+	elif side == "right":
+		score_left += 1
 	else:
 		print("Error: scored on unknown side.")
 		

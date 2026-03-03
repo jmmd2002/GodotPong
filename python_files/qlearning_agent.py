@@ -7,6 +7,8 @@ This agent learns to play Pong using Q-learning with value iteration.
 import random
 import ast
 import json
+import tempfile
+import os
 from pathlib import Path
 
 
@@ -404,9 +406,17 @@ class QLearningAgent:
 
         save_path = Path(filepath)
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(save_path, 'w') as f:
-            json.dump(q_table_str_keys, f, indent=2)
+
+        # Write to a temp file first, then atomically rename.
+        # This prevents corruption if Ctrl+C interrupts mid-write.
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=save_path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, 'w') as f:
+                json.dump(q_table_str_keys, f, indent=2)
+            os.replace(tmp_path, save_path)
+        except Exception:
+            os.unlink(tmp_path)
+            raise
         
         print(f"Q-table saved to {save_path}")
     

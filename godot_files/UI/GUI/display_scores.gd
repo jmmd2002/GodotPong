@@ -21,5 +21,5 @@ func _ready():
 	_on_score_changed(GameManager.score_left, GameManager.score_right)
 
 func _on_score_changed(left, right):
-	label_left.text = str(right)
-	label_right.text = str(left)
+	label_left.text = str(left)
+	label_right.text = str(right)

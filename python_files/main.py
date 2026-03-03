@@ -1,3 +1,4 @@
+import signal
 import socket
 import json
 import yaml
@@ -183,6 +184,7 @@ def main():
                     print(f"State validation error: {e}")
 
     except KeyboardInterrupt:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)  # ignore further Ctrl+C during cleanup
         print("\nShutting down server...")
     finally: #close server
         if save_on_exit:

@@ -5,12 +5,13 @@ extends Node2D
 @export var max_angle: float = PI/3
 
 var velocity: Vector2 = Vector2(0.0,0.0)
+var respawn_timer: float = 0
 
 func _ready():
 	add_to_group("ball")
 	
 	_reset_ball() # start in the center of the screen
-	await get_tree().create_timer(3.0).timeout # start the 3-second countdown
+	await get_tree().create_timer(respawn_timer).timeout # start the 3-second countdown
 	launch_ball() # release ball
 
 func _process(delta):
@@ -37,8 +38,8 @@ func launch_ball() -> void:
 	var angle: float = randf_range(-PI / 4, PI / 4)
 	
 	# Randomly choose left or right
-	if randi() % 2 == 0:
-		angle += PI
+	#if randi() % 2 == 0:
+	angle += PI
 	
 	velocity = Vector2.RIGHT.rotated(angle) * speed
 		
