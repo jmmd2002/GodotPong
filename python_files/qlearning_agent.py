@@ -232,7 +232,6 @@ class QLearningAgent:
                 print(
                     f"Warning: State value for '{key}' out of range: {value}. Clamping to [-1, 1]."
                 )
-                state_dict[key] = max(min(value, 1.0), -1.0)
     
     def _discretize_state(self, state: dict) -> tuple:
         """
@@ -255,7 +254,8 @@ class QLearningAgent:
         # Process each state variable in the order defined by self.state
         for state_var in self.state:
             
-            value = state[state_var]
+            # Clamp here to avoid mutating the caller's dict
+            value = max(min(state[state_var], 1.0), -1.0)
             
             # Get number of bins for this state variable
             num_bins = self.bins_config[state_var]
@@ -388,11 +388,19 @@ class QLearningAgent:
         if self._last_state is None or self._last_action is None:
             return
         
+        # Validate state before discretizing
+        self._validate_state_dict(state)
+        
         # Convert next state from continuous to discrete bins
         state = self._discretize_state(state)
         
         # Update Q-value using the action we took last frame
         self._update_q_value(self._last_state, self._last_action, reward, state, done)
+        
+        # Clear last state/action at episode end to avoid spurious cross-episode transitions
+        if done:
+            self._last_state = None
+            self._last_action = None
     
     def save(self, filepath: str) -> None:
         """

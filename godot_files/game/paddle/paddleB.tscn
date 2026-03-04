@@ -8,7 +8,6 @@ size = Vector2(20, 100)
 
 [node name="Paddle" type="Node2D" unique_id=380931384]
 script = ExtResource("1_ul20x")
-ai_mode = false
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=100063857]
 texture = ExtResource("2_i6yuc")
