@@ -9,6 +9,7 @@ import ast
 import json
 import tempfile
 import os
+import threading
 from pathlib import Path
 
 
@@ -18,12 +19,12 @@ class QLearningAgent:
     DEFAULT_STATE = ["paddleA_y", "paddleB_y", "ball_x", "ball_y", "ball_vx", "ball_vy"]
     DEFAULT_ACTIONS = ["UP", "DOWN", "STAY"]
     DEFAULT_BINS_CONFIG = {
-        "paddleA_y": 6,
-        "paddleB_y": 6,
+        "paddleA_y": 8,
+        "paddleB_y": 4,
         "ball_x": 8,
-        "ball_y": 6,
-        "ball_vx": 3,
-        "ball_vy": 3
+        "ball_y": 8,
+        "ball_vx": 4,
+        "ball_vy": 4
     }
     DEFAULT_ALPHA = 0.1
     DEFAULT_GAMMA = 0.95
@@ -81,9 +82,12 @@ class QLearningAgent:
         # Q(s, a) = estimated value of taking action a in state s
         self.q_table = {}
         
-        # For tracking the last state and action for learning
-        self._last_state = None
-        self._last_action = None
+        # Lock to protect Q-table from concurrent reads/writes across threads
+        self._lock = threading.Lock()
+        
+        # Per-thread storage: each worker thread has its own last_state/last_action
+        # so multiple Godot instances don't overwrite each other's tracking
+        self._local = threading.local()
         
         # For tracking learning progress
         self._updates_count = 0
@@ -95,6 +99,24 @@ class QLearningAgent:
         print(f"State variables: {self.state}")
         print(f"Available actions: {self.actions}")
         print(f"State bins configuration: {self.bins_config}")
+
+    @property
+    def _last_state(self):
+        """Per-thread last state: each worker thread has its own value."""
+        return getattr(self._local, 'last_state', None)
+
+    @_last_state.setter
+    def _last_state(self, value):
+        self._local.last_state = value
+
+    @property
+    def _last_action(self):
+        """Per-thread last action: each worker thread has its own value."""
+        return getattr(self._local, 'last_action', None)
+
+    @_last_action.setter
+    def _last_action(self, value):
+        self._local.last_action = value
     
     def _validate_state(self):
         """
@@ -291,7 +313,9 @@ class QLearningAgent:
             self._exploration_count += 1
         else:
             # EXPLOIT: Pick the action with the highest Q-value in this state
-            q_values = [self.q_table.get((state, a), 0.0) for a in self.actions]
+            # Lock the Q-table so another thread doesn't modify it mid-read
+            with self._lock:
+                q_values = [self.q_table.get((state, a), 0.0) for a in self.actions]
             max_q = max(q_values)
             # If multiple actions have same max value, pick one randomly
             best_actions = [self.actions[i] for i in range(len(self.actions)) 
@@ -348,26 +372,29 @@ class QLearningAgent:
             state: The new discretized state after the action (tuple)
             done: Whether the episode ended (bool)
         """
-        # Get the current Q-value for this state-action pair
-        # If we haven't seen this pair before, default to 0.0
-        current_q = self.q_table.get((prev_state, action), 0.0)
+        # Lock the Q-table for the entire read-compute-write cycle
+        # This prevents two threads from reading the same value and both overwriting it
+        with self._lock:
+            # Get the current Q-value for this state-action pair
+            # If we haven't seen this pair before, default to 0.0
+            current_q = self.q_table.get((prev_state, action), 0.0)
+            
+            # If the episode is over, there's no future value to consider
+            if done:
+                max_next_q = 0.0
+            else:
+                # Otherwise, find the best Q-value for any action in the next state
+                next_q_values = [self.q_table.get((state, a), 0.0) for a in self.actions]
+                max_next_q = max(next_q_values)
+            
+            # Apply the Bellman equation to update the Q-value
+            # New estimate = old estimate + learning_rate * (immediate_reward + future_value - old_estimate)
+            new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
+            
+            # Store the updated Q-value
+            self.q_table[(prev_state, action)] = new_q
         
-        # If the episode is over, there's no future value to consider
-        if done:
-            max_next_q = 0.0
-        else:
-            # Otherwise, find the best Q-value for any action in the next state
-            next_q_values = [self.q_table.get((state, a), 0.0) for a in self.actions]
-            max_next_q = max(next_q_values)
-        
-        # Apply the Bellman equation to update the Q-value
-        # New estimate = old estimate + learning_rate * (immediate_reward + future_value - old_estimate)
-        new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
-        
-        # Store the updated Q-value
-        self.q_table[(prev_state, action)] = new_q
-        
-        # Track learning progress
+        # Track learning progress (outside lock — minor inaccuracy is acceptable)
         self._updates_count += 1
         if new_q > self._max_q_value:
             self._max_q_value = new_q

@@ -13,8 +13,8 @@ state:
 # Maps each state variable to the number of bins to use
 bins_config:
   paddleA_y: 8
-  paddleB_y: 8
-  ball_x: 10
+  paddleB_y: 4
+  ball_x: 8
   ball_y: 8
   ball_vx: 4
   ball_vy: 4
@@ -37,3 +37,4 @@ model:
   load_on_start: true               # Load existing model if file exists
   save_on_exit: true                # Save model when server shuts down
   autosave_every_n_steps: 100      # 0 disables autosave during runtime
+  num_workers: 10                    # Number of parallel Godot instances (ports BASE_PORT to BASE_PORT+N-1)

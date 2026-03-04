@@ -8,6 +8,9 @@ var last_action: String = "STAY"
 var next_frame_id: int = 0
 const RECONNECT_INTERVAL: float = 1.0  # seconds
 
+# Set a different port for each Godot instance in the Inspector (5000, 5001, 5002...)
+@export var port: int = 5000
+
 # sparse reward tracking
 var score_left_prev: int = 0
 var score_right_prev: int = 0
@@ -26,7 +29,14 @@ var game_manager: Node
 @onready var max_speed: float = 3200
 
 func _ready() -> void:
-	print("Connecting to server...")
+	# Allow port to be overridden via command-line: godot -- --port 5001
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	for i in range(args.size() - 1):
+		if args[i] == "--port":
+			port = int(args[i + 1])
+			break
+
+	print("Connecting to server on port ", port, "...")
 	game_manager = GameManager
 
 func _process(delta: float):
@@ -46,7 +56,7 @@ func _process(delta: float):
 				print("Warning: No action received. Keeping last action: ", last_action)
 
 func try_connect():
-	var err: Error = client.connect_to_host("127.0.0.1", 5000)
+	var err: Error = client.connect_to_host("127.0.0.1", port)
 	if err == OK:
 		client.poll() #poll every step for server status
 		if client.get_status() == StreamPeerTCP.STATUS_CONNECTED:
