@@ -15,10 +15,12 @@ func _ready():
 	launch_ball() # release ball
 
 func _process(delta):
-	# Handle collisions
-	handle_collisions()
-	# Move the ball manually
-	position += velocity * delta
+	# Sub-step: split movement so the ball never travels more than its radius in one step
+	var num_steps: int = max(1, int(ceil(velocity.length() * delta / ball_radius)))
+	var sub_delta: float = delta / num_steps
+	for _i in range(num_steps):
+		position += velocity * sub_delta
+		handle_collisions()
 	return
 	
 func _reset_ball():
@@ -48,9 +50,13 @@ func launch_ball() -> void:
 # --------------------- Collision handlers --------------------------
 
 func handle_collisions() -> void:
-	var wall: Node = check_wall_collision() 
+	var wall: Node = check_wall_collision()
 	if wall:
-		velocity.y = -velocity.y 
+		var wall_center_y: float = wall.global_position.y
+		# Only reflect if moving toward the wall, not away from it
+		if (global_position.y < wall_center_y and velocity.y > 0) or \
+		   (global_position.y > wall_center_y and velocity.y < 0):
+			velocity.y = -velocity.y
 		
 	var paddle: Node = check_paddle_collision()
 	if paddle:
