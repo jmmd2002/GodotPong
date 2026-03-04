@@ -115,10 +115,10 @@ func send_state() -> int:
 func normalize_state(state: Dictionary) -> Dictionary:
 	'''Normalize state values between -1 and 1'''
 
-	var paddleA_y: float = (state.get("paddleA_y") - max_y/2) / max_y
-	var paddleB_y: float = (state.get("paddleB_y") - max_y/2) / max_y
-	var ball_x: float = (state.get("ball_x") - max_x/2) / max_x
-	var ball_y: float = (state.get("ball_y") - max_y/2) / max_y
+	var paddleA_y: float = (state.get("paddleA_y") - max_y/2) / (max_y/2)
+	var paddleB_y: float = (state.get("paddleB_y") - max_y/2) / (max_y/2)
+	var ball_x: float = (state.get("ball_x") - max_x/2) / (max_x/2)
+	var ball_y: float = (state.get("ball_y") - max_y/2) / (max_y/2)
 	var ball_vx: float = state.get("ball_vx") / max_speed
 	var ball_vy: float = state.get("ball_vy") / max_speed
 
