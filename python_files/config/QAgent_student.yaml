@@ -43,6 +43,6 @@ model:
 logs:
   log_every_n_steps: 100            # How often worker 0 records a stats snapshot (0 disables)
   log_dir: logs                     # Relative to python_files/; a timestamped subfolder is created here
-  reward_window: 1                 # Number of recent episodes used to compute avg reward
+  reward_window: 20                 # Number of recent episodes used to compute avg reward
   plot_enabled: false                # Show the live matplotlib training plot
   plot_refresh_interval: 5.0        # Seconds between plot refreshes
