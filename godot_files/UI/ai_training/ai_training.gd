@@ -1,93 +1,47 @@
-extends Control
+extends Node2D
 
-@onready var label: Label = $Title
-@onready var vs_static_button: Button = $TrainVsStaticButton
-@onready var vs_homing_button: Button = $TrainVsHomingButton
-@onready var vs_coach_button: Button = $TrainVsCoachButton
-@onready var coach_button: Button = $TrainCoachButton
-@onready var back_button: Button = $BackButton
+@export var ball_scene: PackedScene
 
-const MENU_PATH: String = "res://UI/main_menu/main_menu.tscn"
-const GAME_PATH: String = "res://game/game/game.tscn"
-const COACH_TRAINING_PATH: String = "res://UI/ai_training/coach_training.tscn"
-
+var paddle_a: Node2D
+var paddle_b: Node2D
 
 func _ready() -> void:
-	var viewport_size: Vector2 = get_viewport_rect().size
-	var big_spacing: float = 50.0
-	var small_spacing: float = 16.0
-	var button_size: Vector2 = Vector2(220.0, 30.0)
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 
-	label.text = "AI TRAINING"
-	label.position = Vector2(viewport_size.x / 2 - label.size.x / 2, viewport_size.y / 6 - label.size.y / 2)
+	paddle_a = $PaddleA
+	paddle_a.position = Vector2(40.0, viewport_size.y / 2)
 
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(1.0, 0.6, 0.1)
+	paddle_b = _spawn_paddle($PaddleB, Global.paddle_b_mode, "b", "PaddleB")
+	paddle_b.position = Vector2(viewport_size.x - 40.0, viewport_size.y / 2)
 
-	var style_hover: StyleBoxFlat = StyleBoxFlat.new()
-	style_hover.bg_color = Color(1.0, 0.75, 0.3)
+	$Ball.position = Vector2(viewport_size.x / 2, viewport_size.y / 2)
+	$Ceiling.position = Vector2(0.0, 0.0)
+	$Floor.position = Vector2(0.0, viewport_size.y - $Floor.thickness)
+	$KillZoneA.position = Vector2(20.0 - $KillZoneA.thickness / 2, viewport_size.y / 2)
+	$KillZoneB.position = Vector2(viewport_size.x - 20.0 + $KillZoneB.thickness / 2, viewport_size.y / 2)
 
-	var style_back: StyleBoxFlat = StyleBoxFlat.new()
-	style_back.bg_color = Color(0.4, 0.4, 0.4)
-
-	var training_buttons: Array = [vs_static_button, vs_homing_button, vs_coach_button, coach_button]
-	var training_labels: Array = ["Train vs Static", "Train vs Homing", "Train vs Coach", "Train Coach"]
-
-	for i in training_buttons.size():
-		var btn: Button = training_buttons[i]
-		btn.text = training_labels[i]
-		btn.size = button_size
-		btn.add_theme_stylebox_override("normal", style)
-		btn.add_theme_stylebox_override("hover", style_hover)
-
-	back_button.size = Vector2(80.0, 24.0)
-	back_button.text = "< Back"
-	back_button.add_theme_stylebox_override("normal", style_back)
-
-	var center_x: float = viewport_size.x / 2 - button_size.x / 2
-	var start_y: float = label.position.y + label.size.y + big_spacing
-
-	for i in training_buttons.size():
-		training_buttons[i].position = Vector2(center_x, start_y + i * (button_size.y + small_spacing))
-
-	back_button.position = Vector2(small_spacing, viewport_size.y - back_button.size.y - small_spacing)
-
-	vs_static_button.pressed.connect(_on_vs_static_pressed)
-	vs_homing_button.pressed.connect(_on_vs_homing_pressed)
-	vs_coach_button.pressed.connect(_on_vs_coach_pressed)
-	coach_button.pressed.connect(_on_coach_pressed)
-	back_button.pressed.connect(_on_back_pressed)
+	Dispatcher.ball_destroyed.connect(_on_ball_destroyed)
 
 
-func _on_vs_static_pressed() -> void:
-	Global.training_mode = "vs_static"
-	Global.paddle_a_mode = "ai_qlearn"
-	Global.paddle_b_mode = "static"
-	get_tree().change_scene_to_file(GAME_PATH)
+func _spawn_paddle(placeholder: Node2D, mode: String, side: String, node_name: String) -> Node2D:
+	placeholder.free()
+	var scene_key: String = "manual_" + side if mode == "manual" else mode
+	var scene_path: String = Global.PADDLE_SCENES.get(scene_key, Global.PADDLE_SCENES["static"])
+	var paddle: Node2D = (load(scene_path) as PackedScene).instantiate()
+	paddle.name = node_name
+	add_child(paddle)
+	return paddle
 
 
-func _on_vs_homing_pressed() -> void:
-	Global.training_mode = "vs_homing"
-	Global.paddle_a_mode = "ai_qlearn"
-	Global.paddle_b_mode = "homing"
-	get_tree().change_scene_to_file(GAME_PATH)
+func _on_ball_destroyed() -> void:
+	spawn_ball()
 
 
-func _on_vs_coach_pressed() -> void:
-	# PaddleA trains against the pre-trained coach model
-	Global.training_mode = "vs_coach"
-	Global.paddle_a_mode = "ai_qlearn"
-	Global.paddle_b_mode = "coach"
-	get_tree().change_scene_to_file(GAME_PATH)
-
-
-func _on_coach_pressed() -> void:
-	# Trains coach to train Qagent later
-	Global.training_mode = "coach"
-	Global.paddle_a_mode = "ai_qlearn"
-	Global.paddle_b_mode = "off"
-	get_tree().change_scene_to_file(COACH_TRAINING_PATH)
-
-
-func _on_back_pressed() -> void:
-	get_tree().change_scene_to_file(MENU_PATH)
+func spawn_ball() -> void:
+	var active_balls = get_tree().get_nodes_in_group("ball").filter(
+		func(b): return not b.is_queued_for_deletion()
+	)
+	if active_balls.size() > 0:
+		return
+	var ball = ball_scene.instantiate()
+	add_child(ball)

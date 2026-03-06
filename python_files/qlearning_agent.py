@@ -88,6 +88,7 @@ class QLearningAgent:
         total_states = 1
         for num_bins in self.bins_config.values():
             total_states *= num_bins
+        self._total_states = total_states
         self._total_state_action_pairs = total_states * len(self.actions)
         
         print("Q-Learning Agent initialized")
@@ -170,7 +171,7 @@ class QLearningAgent:
             print(f"Warning: Epsilon (exploration rate) should be in the range [0, 1]. Resetting to default {self.DEFAULT_EPSILON}.")
     
     @classmethod
-    def from_dict(cls: 'QLearningAgent', config_dict: dict):
+    def from_dict(cls: 'QLearningAgent', config_dict: dict) -> 'QLearningAgent':
         """
         Create a QLearningAgent instance from a configuration dictionary.
         
@@ -443,7 +444,46 @@ class QLearningAgent:
             raise
         
         print(f"Q-table saved to {save_path}")
-    
+
+    def export_for_godot(self, output_path: str) -> None:
+        """
+        Export Q-table to a JSON file that Godot can consume directly.
+
+        The file has the following structure:
+            {
+                "state_vars": ["paddle_y", "ball_x", ...],
+                "bins":       {"paddle_y": 4, "ball_x": 8, ...},
+                "actions":    ["UP", "DOWN", "STAY"],
+                "qtable": {
+                    "((0, 3, 5, 1, 2), 'UP')": 0.5,
+                    ...
+                }
+            }
+
+        Keys in "qtable" are the same integer bin-index tuples used internally,
+        serialised with str().  Godot reads "state_vars" and "bins", normalises
+        the continuous game state to [-1, 1], discretises each variable into its
+        bin index, then looks up the resulting integer-tuple key directly.
+        No float bin-centre conversion is needed.
+        """
+        with self._lock:
+            items = list(self.q_table.items())
+
+        godot_table: dict[str, float] = {str(k): v for k, v in items}
+
+        export_data = {
+            "state_vars": self.state,
+            "bins":       self.bins_config,
+            "actions":    self.actions,
+            "qtable":     godot_table,
+        }
+
+        out = Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, 'w') as f:
+            json.dump(export_data, f, indent=2)
+        print(f"Exported {len(godot_table)} entries (Godot format) to {out}")
+
     def load(self, filepath: str) -> None:
         """
         Load a previously saved Q-table from file.
@@ -482,6 +522,7 @@ class QLearningAgent:
         if not self.q_table:
             stats = {
                 "num_entries": 0,
+                "num_states": 0,
                 "avg_q": 0.0,
                 "max_q": 0.0,
                 "min_q": 0.0,
@@ -492,13 +533,15 @@ class QLearningAgent:
             q_values = list(self.q_table.values())
             avg_q = sum(q_values) / len(q_values)
             variance = sum((v - avg_q) ** 2 for v in q_values) / len(q_values)
+            unique_states = len(set(s for s, _a in self.q_table.keys()))
             stats = {
                 "num_entries": len(self.q_table),
+                "num_states": unique_states,
                 "avg_q": avg_q,
                 "max_q": max(q_values),
                 "min_q": min(q_values),
                 "std_q": math.sqrt(variance),
-                "q_coverage": len(self.q_table) / self._total_state_action_pairs * 100,
+                "q_coverage": unique_states / self._total_states * 100,
             }
         
         # Add learning progress stats

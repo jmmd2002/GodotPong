@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://b3nf8rv1xs5wd" path="res://UI/ai_training/coach_training.gd" id="1_ct001"]
 [ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="2_ct002"]
-[ext_resource type="PackedScene" path="res://game/paddle/paddle_base.tscn" id="3_ct003"]
+[ext_resource type="PackedScene" uid="uid://dn4qs7ircfeqp" path="res://game/paddle/paddle_ai.tscn" id="3_ct003"]
 [ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="4_ct004"]
 [ext_resource type="PackedScene" path="res://game/wall/side_wall.tscn" id="5_ct005"]
 [ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/kill_zone/kill_zone.tscn" id="6_ct006"]

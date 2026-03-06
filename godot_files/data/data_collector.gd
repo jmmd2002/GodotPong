@@ -65,8 +65,11 @@ func try_connect():
 			next_frame_id = 0
 			score_left_prev = game_manager.score_left
 			score_right_prev = game_manager.score_right
+			var handshake: String = JSON.stringify({"type": "handshake", "training_mode": Global.training_mode}) + "\n"
+			client.put_data(handshake.to_utf8_buffer())
 			print("Connected to Python server!")
 		else:
+			client = StreamPeerTCP.new()
 			print("Connecting...")
 	else:
 		client = StreamPeerTCP.new()

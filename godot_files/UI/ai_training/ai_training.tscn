@@ -1,63 +1,39 @@
-[gd_scene format=3 uid="uid://dv8nr3km5txqp"]
+[gd_scene format=3 uid="uid://bm3kpq7dst4nh"]
 
-[ext_resource type="Script" uid="uid://cx5oq3fwt8hny" path="res://UI/ai_training/ai_training.gd" id="1_csscr"]
-[ext_resource type="FontFile" uid="uid://dnvrai1uy21tu" path="res://assets/fonts/joystix monospace.otf" id="2_csscr"]
+[ext_resource type="Script" uid="uid://cx9n2pq4vt7ab" path="res://UI/ai_training/ai_training.gd" id="1_gsnfh"]
+[ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="2_wmtbk"]
+[ext_resource type="PackedScene" uid="uid://cvucmw8g7xtid" path="res://UI/GUI/GUI.tscn" id="3_uoos0"]
+[ext_resource type="PackedScene" uid="uid://dn4qs7ircfeqp" path="res://game/paddle/paddle_ai.tscn" id="4_paddleA"]
+[ext_resource type="PackedScene" path="res://game/paddle/paddle_base.tscn" id="5_paddleB"]
+[ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="6_c3e8q"]
+[ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/kill_zone/kill_zone.tscn" id="7_fneed"]
+[ext_resource type="PackedScene" uid="uid://bklohefig8pcl" path="res://data/data_collector.tscn" id="8_wmtbk"]
 
-[node name="AITraining" type="Control" unique_id=742918301]
-layout_mode = 3
-anchors_preset = 0
-script = ExtResource("1_csscr")
+[node name="Game" type="Node2D"]
+script = ExtResource("1_gsnfh")
+ball_scene = ExtResource("2_wmtbk")
 
-[node name="Title" type="Label" parent="." unique_id=510284673]
-layout_direction = 1
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -120.0
-offset_top = -60.0
-offset_right = 120.0
-offset_bottom = 60.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_fonts/font = ExtResource("2_csscr")
-theme_override_font_sizes/font_size = 36
-horizontal_alignment = 1
-vertical_alignment = 1
+[node name="CanvasLayer" parent="." instance=ExtResource("3_uoos0")]
+layer = -1
 
-[node name="TrainVsStaticButton" type="Button" parent="." unique_id=100284471]
-layout_mode = 0
-offset_right = 80.0
-offset_bottom = 20.0
-theme_override_fonts/font = ExtResource("2_csscr")
-theme_override_font_sizes/font_size = 16
+[node name="PaddleA" parent="." instance=ExtResource("4_paddleA")]
+position = Vector2(279, 26)
 
-[node name="TrainVsHomingButton" type="Button" parent="." unique_id=200284472]
-layout_mode = 0
-offset_right = 80.0
-offset_bottom = 20.0
-theme_override_fonts/font = ExtResource("2_csscr")
-theme_override_font_sizes/font_size = 16
+[node name="PaddleB" parent="." instance=ExtResource("5_paddleB")]
+position = Vector2(-97, 7)
 
-[node name="TrainVsCoachButton" type="Button" parent="." unique_id=300284473]
-layout_mode = 0
-offset_right = 80.0
-offset_bottom = 20.0
-theme_override_fonts/font = ExtResource("2_csscr")
-theme_override_font_sizes/font_size = 16
+[node name="Ceiling" parent="." instance=ExtResource("6_c3e8q")]
+position = Vector2(41, -199)
 
-[node name="TrainCoachButton" type="Button" parent="." unique_id=500284475]
-layout_mode = 0
-offset_right = 80.0
-offset_bottom = 20.0
-theme_override_fonts/font = ExtResource("2_csscr")
-theme_override_font_sizes/font_size = 16
+[node name="Floor" parent="." instance=ExtResource("6_c3e8q")]
+position = Vector2(36, 122)
 
-[node name="BackButton" type="Button" parent="." unique_id=400284474]
-layout_mode = 0
-offset_right = 60.0
-offset_bottom = 20.0
-theme_override_fonts/font = ExtResource("2_csscr")
-theme_override_font_sizes/font_size = 14
+[node name="Ball" parent="." instance=ExtResource("2_wmtbk")]
+position = Vector2(87, 15)
+
+[node name="KillZoneA" parent="." instance=ExtResource("7_fneed")]
+position = Vector2(-99, 22)
+side = "left"
+
+[node name="DataCollector" parent="." instance=ExtResource("8_wmtbk")]
+position = Vector2(-188, 145)

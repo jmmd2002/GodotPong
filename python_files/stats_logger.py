@@ -10,9 +10,14 @@ _build_extra_row() to extract the method-specific data from its stats dict.
 """
 
 import csv
+import gzip
+import io
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
+
+import yaml
 
 
 class StatsLogger:
@@ -72,12 +77,18 @@ class StatsLogger:
         with self._lock:
             self._buffer.append(row)
 
-    def save_csv(self, path: Path) -> None:
+    def save_log(self, base_dir: Path, config: dict) -> None:
         """
-        Write the buffered records to a CSV file.
+        Write the buffered records to a timestamped folder inside base_dir.
+
+        Creates:
+            base_dir/log_<YYYYMMDD_HHMMSS>/
+                training.csv.gz   — gzip-compressed CSV of all recorded rows
+                config.yaml       — copy of the training configuration
 
         Args:
-            path: Destination file path. Parent directories are created if needed.
+            base_dir: Parent directory under which the log folder is created.
+            config:   Raw config dict to snapshot alongside the CSV.
         """
         with self._lock:
             snapshot = list(self._buffer)
@@ -86,15 +97,23 @@ class StatsLogger:
             print("StatsLogger: no data to save.")
             return
 
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = Path(base_dir) / f"log_{timestamp}"
+        log_dir.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=self.FIELDS)
+        # Write gzip-compressed CSV
+        csv_path = log_dir / "training.csv.gz"
+        with gzip.open(csv_path, "wt", newline="", encoding="utf-8") as gz:
+            writer = csv.DictWriter(gz, fieldnames=self.FIELDS)
             writer.writeheader()
             writer.writerows(snapshot)
 
-        print(f"Training log saved to {path} ({len(snapshot)} records)")
+        # Write config snapshot
+        config_path = log_dir / "config.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+        print(f"Training log saved to {log_dir} ({len(snapshot)} records)")
 
 
 class QLearningStatsLogger(StatsLogger):
@@ -127,7 +146,7 @@ class QLearningStatsLogger(StatsLogger):
         if not stats:
             return {field: "" for field in self.EXTRA_FIELDS}
         return {
-            "q_states":         stats.get("num_entries", 0),
+            "q_states":         stats.get("num_states", 0),
             "q_coverage":       round(stats.get("q_coverage", 0.0), 4),
             "avg_q":            round(stats.get("avg_q", 0.0), 6),
             "max_q":            round(stats.get("max_q", 0.0), 6),

@@ -10,9 +10,13 @@ from stats_logger import QLearningStatsLogger
 from live_plotter import QLearningLivePlotter
 
 
-# Config files
-QAGENT_CONFIG_PATH = Path(__file__).parent / "config" / "QAgent_config.yaml"
-COACH_CONFIG_PATH = Path(__file__).parent / "config" / "Coach_config.yaml"
+# Maps training_mode (from Godot handshake) to the config file to load
+CONFIG_MAP: dict[str, Path] = {
+    "vs_static": Path(__file__).parent / "config" / "QAgent_config.yaml",
+    "vs_homing": Path(__file__).parent / "config" / "QAgent_config.yaml",
+    "vs_coach":  Path(__file__).parent / "config" / "QAgent_config.yaml",
+    "coach":     Path(__file__).parent / "config" / "QAgent_coach.yaml",
+}
 
 HOST = "127.0.0.1"
 BASE_PORT = 5000       # First worker listens here
@@ -25,14 +29,47 @@ DEFAULT_SAVE_ON_EXIT = True
 DEFAULT_AUTOSAVE_EVERY_N_STEPS = 1000
 DEFAULT_NUM_WORKERS = 1
 DEFAULT_LOG_EVERY_N_STEPS = 100   # 0 disables stats logging
-DEFAULT_LOG_PATH = "logs/training_log.csv"
+DEFAULT_LOG_DIR = "logs"
 DEFAULT_REWARD_WINDOW = 20        # Episodes used to compute avg reward
 
 
-def load_agent() -> tuple[QLearningAgent, dict]:
-    """Load Q-learning agent and raw config from config file."""
-    config_path = QAGENT_CONFIG_PATH #TODO: somehow make this change according to godot
-    
+def receive_handshake() -> str:
+    """Listen on BASE_PORT for the first Godot connection, read the handshake JSON,
+    then close. Returns the training_mode string. Workers will re-accept on the same port."""
+    print(f"Waiting for handshake on port {BASE_PORT}...")
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    server.bind((HOST, BASE_PORT))
+    server.listen(1)
+    conn, addr = server.accept()
+    print(f"Handshake connection from {addr}")
+    try:
+        buffer = ""
+        while True:
+            data = conn.recv(4096)
+            if not data:
+                raise ConnectionError("Connection closed before handshake.")
+            buffer += data.decode()
+            if "\n" in buffer:
+                line, _ = buffer.split("\n", 1)
+                msg: dict = json.loads(line.strip())
+                if msg.get("type") == "handshake":
+                    training_mode = msg.get("training_mode", "vs_static")
+                    print(f"Handshake received: training_mode='{training_mode}'")
+                    return training_mode
+                raise ValueError(f"Expected handshake, got: {msg}")
+    finally:
+        conn.close()
+        server.close()
+
+
+def load_agent(training_mode: str) -> tuple[QLearningAgent, dict]:
+    """Load Q-learning agent and raw config for the given training_mode."""
+    config_path = CONFIG_MAP.get(training_mode)
+    if config_path is None:
+        print(f"[WARNING] Unknown training_mode '{training_mode}'. Using default config.")
+        config_path = CONFIG_MAP["vs_static"]
     try:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
@@ -132,8 +169,14 @@ def validate_log_config(config) -> dict:
         return value
 
     log_every_n_steps = get("log_every_n_steps", int, DEFAULT_LOG_EVERY_N_STEPS)
-    log_path          = get("log_path",          str, DEFAULT_LOG_PATH)
+    log_dir           = get("log_dir",           str, DEFAULT_LOG_DIR)
     reward_window     = get("reward_window",     int, DEFAULT_REWARD_WINDOW)
+    plot_enabled      = get("plot_enabled",      bool, True)
+    plot_refresh_interval = config.get("plot_refresh_interval", 5.0)
+    if not isinstance(plot_refresh_interval, (int, float)) or plot_refresh_interval <= 0:
+        print(f"[WARNING] logs.plot_refresh_interval must be a positive number. Using default: 5.0")
+        plot_refresh_interval = 5.0
+    plot_refresh_interval = float(plot_refresh_interval)
 
     if log_every_n_steps < 0:
         print(f"[WARNING] logs.log_every_n_steps must be >= 0. Using default: {DEFAULT_LOG_EVERY_N_STEPS}")
@@ -144,8 +187,10 @@ def validate_log_config(config) -> dict:
 
     return {
         "log_every_n_steps": log_every_n_steps,
-        "log_path":          log_path,
+        "log_dir":           log_dir,
         "reward_window":     reward_window,
+        "plot_enabled":      plot_enabled,
+        "plot_refresh_interval": plot_refresh_interval,
     }
 
 
@@ -180,7 +225,12 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     server.settimeout(1.0)  # allows checking shutdown_event periodically
-    server.bind((HOST, port))
+    try:
+        server.bind((HOST, port))
+    except OSError as e:
+        print(f"[W{worker_id}] FATAL: Could not bind to port {port}: {e}")
+        server.close()
+        return
     server.listen(1)
     print(f"[W{worker_id}] Listening on port {port}...")
 
@@ -222,7 +272,12 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
 
                 try:
                     message: dict = json.loads(line)
-                    
+
+                    # Skip handshake messages (sent by each Godot instance on connect)
+                    if message.get("type") == "handshake":
+                        print(f"[W{worker_id}] Handshake received: training_mode='{message.get('training_mode')}'")
+                        continue
+
                     frame_id = message.get("frame_id")
                     prev_reward = message.get("prev_reward")
                     done = message.get("done")
@@ -284,7 +339,8 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
 
 def main():
     """Start all workers and wait for Ctrl+C."""
-    agent, config = load_agent()
+    training_mode = receive_handshake()
+    agent, config = load_agent(training_mode)
 
     model_config: dict = validate_model_config(config.get("model"))
     model_path: Path = Path(__file__).parent / model_config.get("path")
@@ -295,8 +351,10 @@ def main():
 
     log_config: dict = validate_log_config(config.get("logs"))
     log_every_n_steps: int = log_config.get("log_every_n_steps")
-    log_path: Path = Path(__file__).parent / log_config.get("log_path")
+    log_base_dir: Path = Path(__file__).parent / log_config.get("log_dir")
     reward_window: int = log_config.get("reward_window")
+    plot_enabled: bool = log_config.get("plot_enabled")
+    plot_refresh_interval: float = log_config.get("plot_refresh_interval")
 
     if load_on_start and model_path.exists():
         try:
@@ -317,10 +375,8 @@ def main():
     # Stats logger (worker 0 records into it; main saves CSV on exit)
     stats_logger = QLearningStatsLogger()
 
-    # Live plot thread (reads from stats_logger, redraws every 5s)
-    plotter = QLearningLivePlotter(stats_logger, refresh_interval=5.0, reward_window=reward_window)
-    plotter.start(shutdown_event)
-
+    # Start all workers FIRST so every port is bound before matplotlib
+    # touches the Tk event loop (plt.pause on a background thread blocks on Linux).
     threads: list[threading.Thread] = []
     for i in range(num_workers):
         t = threading.Thread(
@@ -335,17 +391,31 @@ def main():
         t.start()
         threads.append(t)
 
-    try:
-        # Main thread just waits; workers do all the work
+    # Watch-dog thread: sets shutdown_event when every worker exits naturally
+    # (e.g. all Godot windows are closed), which unblocks the plotter below.
+    def _watch_workers():
         for t in threads:
             t.join()
+        shutdown_event.set()
+    threading.Thread(target=_watch_workers, daemon=True, name="worker-watchdog").start()
+
+    # Run the plot loop on the main thread — TkAgg requires GUI calls on the
+    # main thread on Linux; running it as a daemon thread caused plt.pause()
+    # to stall the process and delay worker socket binding.
+    # If plotting is disabled, the main thread simply waits for shutdown_event.
+    plotter = QLearningLivePlotter(stats_logger, refresh_interval=plot_refresh_interval, reward_window=reward_window)
+    try:
+        if plot_enabled:
+            plotter._run(shutdown_event)   # blocks until shutdown_event is set
+        else:
+            shutdown_event.wait()          # no plot; just wait for workers to finish
     except KeyboardInterrupt:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         print("\nShutting down all workers...")
+    finally:
         shutdown_event.set()
         for t in threads:
-            t.join()
-    finally:
+            t.join(timeout=2.0)
         if save_on_exit:
             with save_lock:
                 try:
@@ -353,7 +423,7 @@ def main():
                     print("Final model saved.")
                 except Exception as e:
                     print(f"Failed to save model: {e}")
-        stats_logger.save_csv(log_path)
+        stats_logger.save_log(log_base_dir, config)
         print("Done.")
 
 

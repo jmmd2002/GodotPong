@@ -31,14 +31,16 @@ hyperparameters:
 
 # Model persistence settings
 model:
-  path: models/q_coach_table.json         # Relative to python_files/
+  path: models/q_table_coach.json         # Relative to python_files/
   load_on_start: true               # Load existing model if file exists
   save_on_exit: true                # Save model when server shuts down
   autosave_every_n_steps: 100       # 0 disables autosave during runtime
-  num_workers: 2                    # Number of parallel Godot instances (ports BASE_PORT to BASE_PORT+N-1)
+  num_workers: 10              # Number of parallel Godot instances (ports BASE_PORT to BASE_PORT+N-1)
 
 # Logging / monitoring settings
 logs:
   log_every_n_steps: 100            # How often worker 0 records a stats snapshot (0 disables)
-  log_path: logs/coach_training_log.csv   # Relative to python_files/; written on shutdown
-  reward_window: 20            # Number of recent episodes used to compute avg reward
+  log_dir: logs                     # Relative to python_files/; a timestamped subfolder is created here
+  reward_window: 20                 # Number of recent episodes used to compute avg reward
+  plot_enabled: true                # Show the live matplotlib training plot
+  plot_refresh_interval: 5.0        # Seconds between plot refreshes

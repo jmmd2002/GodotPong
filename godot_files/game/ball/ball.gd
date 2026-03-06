@@ -21,7 +21,8 @@ func _process(delta):
 	var sub_delta: float = delta / num_steps
 	for _i in range(num_steps):
 		position += velocity * sub_delta
-		handle_collisions()
+		if handle_collisions():
+			return  # ball was destroyed by a kill zone, stop processing
 
 	# Guard: respawn ball if it has escaped the viewport (physics edge case)
 	var vp: Rect2 = get_viewport_rect()
@@ -58,7 +59,14 @@ func launch_ball() -> void:
 		
 # --------------------- Collision handlers --------------------------
 
-func handle_collisions() -> void:
+func handle_collisions() -> bool:
+	var kill_zone: Node = check_kill_zone_collision()
+	if kill_zone:
+		queue_free()
+		Dispatcher.emit_ball_destroyed()
+		Dispatcher.emit_scored(kill_zone.side)
+		return true
+
 	var wall: Node = check_wall_collision()
 	if wall:
 		var wall_center_y: float = wall.global_position.y
@@ -91,7 +99,7 @@ func handle_collisions() -> void:
 			speed *= 1.1 #accelerate ball after collision
 			speed = min(speed, max_speed) #cap speed
 			velocity = dir * Vector2(1.0,0).rotated(-dir * angle) * speed
-	return
+	return false
 	
 func check_paddle_collision() -> Node:
 	for paddle in get_tree().get_nodes_in_group("paddle"):
@@ -100,6 +108,14 @@ func check_paddle_collision() -> Node:
 		
 		if ball_rect.intersects(paddle_rect):
 			return paddle
+	return null
+
+func check_kill_zone_collision() -> Node:
+	for kill_zone in get_tree().get_nodes_in_group("kill_zone"):
+		var ball_rect: Rect2 = Utils.get_global_rect($CollisionShape2D)
+		var kz_rect: Rect2 = Utils.get_global_rect(kill_zone.get_node("CollisionShape2D"))
+		if ball_rect.intersects(kz_rect):
+			return kill_zone
 	return null
 
 func check_side_wall_collision() -> Node:

@@ -1,7 +1,7 @@
 extends "res://game/paddle/paddle_base.gd"
 
 # Driven externally via set_ai_action().
-# Covers both the ai_qlearn and coach agent roles.
+# Used as the ai_training_paddle — the agent being trained.
 
 func get_direction() -> int:
 	if ai_action == "UP":

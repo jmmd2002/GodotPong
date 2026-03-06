@@ -1,0 +1,63 @@
+[gd_scene format=3 uid="uid://dv8nr3km5txqp"]
+
+[ext_resource type="Script" uid="uid://cx5oq3fwt8hny" path="res://UI/ai_training/ai_training_menu.gd" id="1_csscr"]
+[ext_resource type="FontFile" uid="uid://dnvrai1uy21tu" path="res://assets/fonts/joystix monospace.otf" id="2_csscr"]
+
+[node name="AITraining" type="Control" unique_id=742918301]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_csscr")
+
+[node name="Title" type="Label" parent="." unique_id=510284673]
+layout_direction = 1
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = -60.0
+offset_right = 120.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = ExtResource("2_csscr")
+theme_override_font_sizes/font_size = 36
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TrainVsStaticButton" type="Button" parent="." unique_id=100284471]
+layout_mode = 0
+offset_right = 80.0
+offset_bottom = 20.0
+theme_override_fonts/font = ExtResource("2_csscr")
+theme_override_font_sizes/font_size = 16
+
+[node name="TrainVsHomingButton" type="Button" parent="." unique_id=200284472]
+layout_mode = 0
+offset_right = 80.0
+offset_bottom = 20.0
+theme_override_fonts/font = ExtResource("2_csscr")
+theme_override_font_sizes/font_size = 16
+
+[node name="TrainVsCoachButton" type="Button" parent="." unique_id=300284473]
+layout_mode = 0
+offset_right = 80.0
+offset_bottom = 20.0
+theme_override_fonts/font = ExtResource("2_csscr")
+theme_override_font_sizes/font_size = 16
+
+[node name="TrainCoachButton" type="Button" parent="." unique_id=500284475]
+layout_mode = 0
+offset_right = 80.0
+offset_bottom = 20.0
+theme_override_fonts/font = ExtResource("2_csscr")
+theme_override_font_sizes/font_size = 16
+
+[node name="BackButton" type="Button" parent="." unique_id=400284474]
+layout_mode = 0
+offset_right = 60.0
+offset_bottom = 20.0
+theme_override_fonts/font = ExtResource("2_csscr")
+theme_override_font_sizes/font_size = 14
