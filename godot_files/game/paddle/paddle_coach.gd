@@ -85,11 +85,11 @@ func get_direction() -> int:
 		var key: String = "(%s, '%s')" % [state_str, action]
 		var q: float    = float(q_table.get(key, 0.0))
 		if q > best_q:
-			best_q       = q
+			best_q = q
 			best_action  = action
 
-    if best_q == -INF:
-        return 0  # No valid actions found in Q-table for this state, default to STAY   
+	if best_q == -INF:
+		return 0  # No valid actions found in Q-table for this state, default to STAY   
 	if best_action == "UP":
 		return -1
 	elif best_action == "DOWN":

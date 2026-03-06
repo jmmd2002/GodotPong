@@ -7,7 +7,7 @@ source python_files/.venv/bin/activate
 BASE_PORT=5000
 NUM_WORKERS=$(python -c "
 import yaml
-with open('python_files/config/QAgent_coach.yaml') as f:
+with open('python_files/config/QAgent_student.yaml') as f:
     c = yaml.safe_load(f)
 print(c.get('model', {}).get('num_workers', 1))
 ")
