@@ -49,8 +49,8 @@ func launch_ball() -> void:
 	var angle: float = randf_range(-PI / 4, PI / 4)
 	
 	# Randomly choose left or right
-	#if randi() % 2 == 0:
-	angle += PI
+	if randi() % 2 == 0:
+		angle += PI
 	
 	velocity = Vector2.RIGHT.rotated(angle) * speed
 		
@@ -66,6 +66,17 @@ func handle_collisions() -> void:
 		if (global_position.y < wall_center_y and velocity.y > 0) or \
 		   (global_position.y > wall_center_y and velocity.y < 0):
 			velocity.y = -velocity.y
+
+	var side_wall: Node = check_side_wall_collision()
+	if side_wall:
+		var wall_center_x: float = side_wall.global_position.x
+		# Only reflect if moving toward the wall
+		if (wall_center_x < position.x and velocity.x < 0) or \
+		   (wall_center_x > position.x and velocity.x > 0):
+			# Bounce back in the opposite x direction
+			var angle: float = randf_range(-max_angle, max_angle)
+			var dir: float = -sign(velocity.x)
+			velocity = Vector2(dir, 0.0).rotated(angle) * speed
 		
 	var paddle: Node = check_paddle_collision()
 	if paddle:
@@ -89,6 +100,14 @@ func check_paddle_collision() -> Node:
 		
 		if ball_rect.intersects(paddle_rect):
 			return paddle
+	return null
+
+func check_side_wall_collision() -> Node:
+	for wall in get_tree().get_nodes_in_group("side_wall"):
+		var ball_rect: Rect2 = Utils.get_global_rect($CollisionShape2D)
+		var wall_rect: Rect2 = Utils.get_global_rect(wall.get_node("CollisionShape2D"))
+		if ball_rect.intersects(wall_rect):
+			return wall
 	return null
 
 func check_wall_collision() -> Node:

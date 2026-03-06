@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://cijla3bhj7w8i"]
+
+[ext_resource type="Script" uid="uid://b3nf8rv1xs5wd" path="res://UI/ai_training/coach_training.gd" id="1_ct001"]
+[ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="2_ct002"]
+[ext_resource type="PackedScene" path="res://game/paddle/paddle_base.tscn" id="3_ct003"]
+[ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="4_ct004"]
+[ext_resource type="PackedScene" path="res://game/wall/side_wall.tscn" id="5_ct005"]
+[ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/kill_zone/kill_zone.tscn" id="6_ct006"]
+[ext_resource type="PackedScene" path="res://data/coach_data_collector.tscn" id="7_ct007"]
+
+[node name="CoachTraining" type="Node2D" unique_id=222222001]
+script = ExtResource("1_ct001")
+ball_scene = ExtResource("2_ct002")
+
+[node name="PaddleA" parent="." unique_id=222222002 instance=ExtResource("3_ct003")]
+position = Vector2(-81, -29)
+
+[node name="Ceiling" parent="." unique_id=222222004 instance=ExtResource("4_ct004")]
+position = Vector2(-53, -215)
+
+[node name="Floor" parent="." unique_id=222222005 instance=ExtResource("4_ct004")]
+position = Vector2(-61, 33)
+
+[node name="BounceWall" parent="." unique_id=222222006 instance=ExtResource("5_ct005")]
+position = Vector2(44, -105)
+
+[node name="KillZone" parent="." unique_id=222222007 instance=ExtResource("6_ct006")]
+side = "left"
+
+[node name="CoachDataCollector" parent="." unique_id=222222008 instance=ExtResource("7_ct007")]

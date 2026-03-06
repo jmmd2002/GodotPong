@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://bwvs5h3jnt8yd"]
+
+[ext_resource type="Script" uid="uid://cxr4m7k9pqn2b" path="res://game/wall/side_wall.gd" id="1_sw001"]
+
+[node name="SideWall" type="StaticBody2D" unique_id=111111001]
+script = ExtResource("1_sw001")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=111111002]
+offset_right = 100.0
+offset_bottom = 100.0
+color = Color(1, 1, 1, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=111111003]

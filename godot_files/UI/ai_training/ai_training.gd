@@ -8,6 +8,8 @@ extends Control
 @onready var back_button: Button = $BackButton
 
 const MENU_PATH: String = "res://UI/main_menu/main_menu.tscn"
+const GAME_PATH: String = "res://game/game/game.tscn"
+const COACH_TRAINING_PATH: String = "res://UI/ai_training/coach_training.tscn"
 
 
 func _ready() -> void:
@@ -58,19 +60,33 @@ func _ready() -> void:
 
 
 func _on_vs_static_pressed() -> void:
-	pass  # TODO: set training mode and launch
+	Global.training_mode = "vs_static"
+	Global.paddle_a_mode = "ai_qlearn"
+	Global.paddle_b_mode = "static"
+	get_tree().change_scene_to_file(GAME_PATH)
 
 
 func _on_vs_homing_pressed() -> void:
-	pass  # TODO: set training mode and launch
+	Global.training_mode = "vs_homing"
+	Global.paddle_a_mode = "ai_qlearn"
+	Global.paddle_b_mode = "homing"
+	get_tree().change_scene_to_file(GAME_PATH)
 
 
 func _on_vs_coach_pressed() -> void:
-	pass  # TODO: set training mode and launch
+	# PaddleA trains against the pre-trained coach model
+	Global.training_mode = "vs_coach"
+	Global.paddle_a_mode = "ai_qlearn"
+	Global.paddle_b_mode = "coach"
+	get_tree().change_scene_to_file(GAME_PATH)
 
 
 func _on_coach_pressed() -> void:
-	pass  # TODO: set training mode and launch
+	# Trains coach to train Qagent later
+	Global.training_mode = "coach"
+	Global.paddle_a_mode = "ai_qlearn"
+	Global.paddle_b_mode = "off"
+	get_tree().change_scene_to_file(COACH_TRAINING_PATH)
 
 
 func _on_back_pressed() -> void:

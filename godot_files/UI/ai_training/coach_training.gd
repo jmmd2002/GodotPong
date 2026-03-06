@@ -2,8 +2,6 @@ extends Node2D
 
 @export var ball_scene: PackedScene
 
-# Maps mode strings to their paddle scene paths.
-# "manual" is resolved per-side in _spawn_paddle().
 const PADDLE_SCENES: Dictionary = {
 	"ai_qlearn": "res://game/paddle/paddle_ai.tscn",
 	"coach":     "res://game/paddle/paddle_ai.tscn",
@@ -11,36 +9,30 @@ const PADDLE_SCENES: Dictionary = {
 	"static":    "res://game/paddle/paddle_static.tscn",
 	"off":       "res://game/paddle/paddle_static.tscn",
 	"manual_a":  "res://game/paddle/paddle_manual_a.tscn",
-	"manual_b":  "res://game/paddle/paddle_manual_b.tscn",
 }
 
 var paddle_a: Node2D
-var paddle_b: Node2D
 
 func _ready() -> void:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 
-	paddle_a = _spawn_paddle($PaddleA, Global.paddle_a_mode, "a", "PaddleA")
+	paddle_a = _spawn_paddle($PaddleA, Global.paddle_a_mode)
 	paddle_a.position = Vector2(40.0, viewport_size.y / 2)
 
-	paddle_b = _spawn_paddle($PaddleB, Global.paddle_b_mode, "b", "PaddleB")
-	paddle_b.position = Vector2(viewport_size.x - 40.0, viewport_size.y / 2)
-
-	$Ball.position = Vector2(viewport_size.x / 2, viewport_size.y / 2)
+	$BounceWall.position = Vector2(viewport_size.x - $BounceWall.thickness, 0.0)
 	$Ceiling.position = Vector2(0.0, 0.0)
 	$Floor.position = Vector2(0.0, viewport_size.y - $Floor.thickness)
-	$KillZoneA.position = Vector2(0.0, viewport_size.y / 2)
-	$KillZoneB.position = Vector2(viewport_size.x, viewport_size.y / 2)
+	$KillZone.position = Vector2(0.0, viewport_size.y / 2)
 
 	Dispatcher.ball_destroyed.connect(_on_ball_destroyed)
+	spawn_ball()
 
 
-func _spawn_paddle(placeholder: Node2D, mode: String, side: String, node_name: String) -> Node2D:
-	placeholder.free()  # immediate, not deferred
-	var scene_key: String = "manual_" + side if mode == "manual" else mode
-	var scene_path: String = PADDLE_SCENES.get(scene_key, PADDLE_SCENES["static"])
+func _spawn_paddle(placeholder: Node2D, mode: String) -> Node2D:
+	placeholder.free()
+	var scene_path: String = PADDLE_SCENES.get(mode, PADDLE_SCENES["static"])
 	var paddle: Node2D = (load(scene_path) as PackedScene).instantiate()
-	paddle.name = node_name
+	paddle.name = "PaddleA"
 	add_child(paddle)
 	return paddle
 
@@ -50,12 +42,10 @@ func _on_ball_destroyed() -> void:
 
 
 func spawn_ball() -> void:
-	# Filter out balls that are already queued for deletion — queue_free() is deferred,
-	# so a just-destroyed ball is still in the group until end of frame.
 	var active_balls = get_tree().get_nodes_in_group("ball").filter(
 		func(b): return not b.is_queued_for_deletion()
 	)
 	if active_balls.size() > 0:
-		return  # a live ball is already on the field
+		return
 	var ball = ball_scene.instantiate()
 	add_child(ball)

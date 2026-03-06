@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://cqr7bwad3nf1x"]
+
+[ext_resource type="Script" uid="uid://dx3np8qw7mv5a" path="res://data/coach_data_collector.gd" id="1_cdc01"]
+
+[node name="CoachDataCollector" type="Node2D" unique_id=333333001]
+script = ExtResource("1_cdc01")
