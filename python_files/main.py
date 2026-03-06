@@ -275,8 +275,6 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                     print(f"[W{worker_id}] Decode error: {e}")
                 except ValueError as e:
                     print(f"[W{worker_id}] State validation error: {e}")
-                except Exception as e:
-                    print(f"[W{worker_id}] Unknown error, skipping step: {e}")
     finally:
         if conn:
             conn.close()
