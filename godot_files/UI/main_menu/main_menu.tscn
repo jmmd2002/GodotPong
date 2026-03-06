@@ -56,3 +56,10 @@ offset_top = 31.0
 offset_right = 44.0
 offset_bottom = 39.0
 theme_override_fonts/font = ExtResource("2_1xao8")
+
+[node name="AITraining" type="Button" parent="." unique_id=601284991]
+layout_mode = 0
+offset_right = 80.0
+offset_bottom = 20.0
+theme_override_fonts/font = ExtResource("2_1xao8")
+theme_override_font_sizes/font_size = 14
