@@ -30,8 +30,8 @@ class QLearningAgent:
     DEFAULT_GAMMA = 0.95
     DEFAULT_EPSILON = 0.2
 
-    def __init__(self, state=None, bins_config=None, actions=None, 
-                 alpha=None, gamma=None, epsilon=None):
+    def __init__(self, state: list = None, bins_config: dict[str, int] = None, actions: list = None, 
+                 alpha: float = None, gamma: float = None, epsilon: float = None):
         """
         Initialize the Q-learning agent.
         
@@ -48,28 +48,16 @@ class QLearningAgent:
             gamma: Discount factor (0 to 1). Default: 0.95
             epsilon: Exploration rate (0 to 1). Default: 0.2
         """
-        # Set state variables
-        if state is None:
-            self.state = self.DEFAULT_STATE
-        else:
-            self.state = state
-        
-        # Set available actions
-        if actions is None:
-            self.actions = self.DEFAULT_ACTIONS
-        else:
-            self.actions = actions
-        
-        # Default bins configuration if none provided
-        if bins_config is None:
-            self.bins_config = self.DEFAULT_BINS_CONFIG
-        else:
-            self.bins_config = bins_config
+
+
+        self.state = state
+        self.actions = actions
+        self.bins_config = bins_config
 
         # Learning hyperparameters
-        self.alpha = alpha if alpha is not None else self.DEFAULT_ALPHA      # Learning rate
-        self.gamma = gamma if gamma is not None else self.DEFAULT_GAMMA     # Discount factor
-        self.epsilon = epsilon if epsilon is not None else self.DEFAULT_EPSILON  # Exploration rate
+        self.alpha = alpha
+        self.gamma = gamma 
+        self.epsilon = epsilon
         
         # Validate configuration
         self._validate_state()
@@ -162,20 +150,17 @@ class QLearningAgent:
         Validate that alpha, gamma, and epsilon are in the range [0, 1].
         Raises ValueError if validation fails.
         """
-        if not isinstance(self.alpha, (int, float)):
-            raise ValueError("Alpha (learning rate) should be a number.")
-        if not (0 <= self.alpha <= 1):
-            raise ValueError("Alpha (learning rate) should be in the range [0, 1].")
+        if not isinstance(self.alpha, (int, float)) or not (0 <= self.alpha <= 1):
+            self.alpha = self.DEFAULT_ALPHA
+            print(f"Warning: Alpha (learning rate) should be in the range [0, 1]. Resetting to default {self.DEFAULT_ALPHA}.")
         
-        if not isinstance(self.gamma, (int, float)):
-            raise ValueError("Gamma (discount factor) should be a number.")
-        if not (0 <= self.gamma <= 1):
-            raise ValueError("Gamma (discount factor) should be in the range [0, 1].")
-        
-        if not isinstance(self.epsilon, (int, float)):
-            raise ValueError("Epsilon (exploration rate) should be a number.")
-        if not (0 <= self.epsilon <= 1):
-            raise ValueError("Epsilon (exploration rate) should be in the range [0, 1].")
+        if not isinstance(self.gamma, (int, float)) or not (0 <= self.gamma <= 1):
+            self.gamma = self.DEFAULT_GAMMA
+            print(f"Warning: Gamma (discount factor) should be in the range [0, 1]. Resetting to default {self.DEFAULT_GAMMA}.")
+
+        if not isinstance(self.epsilon, (int, float)) or not (0 <= self.epsilon <= 1):
+            self.epsilon = self.DEFAULT_EPSILON
+            print(f"Warning: Epsilon (exploration rate) should be in the range [0, 1]. Resetting to default {self.DEFAULT_EPSILON}.")
     
     @classmethod
     def from_dict(cls: 'QLearningAgent', config_dict: dict):
@@ -190,15 +175,15 @@ class QLearningAgent:
         Returns:
             QLearningAgent instance configured with the provided parameters.
         """
-        state = config_dict.get('state', None)
-        bins_config = config_dict.get('bins_config', None)
-        actions = config_dict.get('actions', None)
+        state = config_dict.get('state')
+        bins_config = config_dict.get('bins_config')
+        actions = config_dict.get('actions')
         
         # Extract hyperparameters from config
-        hyperparams: dict = config_dict.get('hyperparameters', {})
-        alpha = hyperparams.get('alpha', 0.1)
-        gamma = hyperparams.get('gamma', 0.95)
-        epsilon = hyperparams.get('epsilon', 0.2)
+        hyperparams: dict = config_dict.get('hyperparameters')
+        alpha = hyperparams.get('alpha')
+        gamma = hyperparams.get('gamma')
+        epsilon = hyperparams.get('epsilon')
         
         return cls(state=state, bins_config=bins_config, actions=actions,
                    alpha=alpha, gamma=gamma, epsilon=epsilon)
@@ -254,8 +239,9 @@ class QLearningAgent:
                 print(
                     f"Warning: State value for '{key}' out of range: {value}. Clamping to [-1, 1]."
                 )
+                #clamping done in _discretize_state to avoid mutating caller's dict
     
-    def _discretize_state(self, state: dict) -> tuple:
+    def _discretize_state(self, state: dict) -> tuple[int, ...]:
         """
         Convert normalized continuous state into discrete bins based on configuration.
         
@@ -271,12 +257,12 @@ class QLearningAgent:
             Order matches the order of self.state list.
             Returns None if state is incomplete.
         """
-        discretized = []
+        discretized: list[int] = []
         
         # Process each state variable in the order defined by self.state
         for state_var in self.state:
             
-            # Clamp here to avoid mutating the caller's dict
+            # Validation done in _validate_state_dict. Clamp here to avoid mutating the caller's dict
             value = max(min(state[state_var], 1.0), -1.0)
             
             # Get number of bins for this state variable
@@ -287,7 +273,6 @@ class QLearningAgent:
             
             # Calculate which bin this value falls into
             bin_index = self._calculate_bin_index(normalized_value, num_bins)
-            
             discretized.append(bin_index)
         
         # Return as a tuple - this becomes our "state" identifier
@@ -310,7 +295,6 @@ class QLearningAgent:
         if random.random() < self.epsilon:
             # EXPLORE: Pick a random action
             action = random.choice(self.actions)
-            self._exploration_count += 1
         else:
             # EXPLOIT: Pick the action with the highest Q-value in this state
             # Lock the Q-table so another thread doesn't modify it mid-read
@@ -321,7 +305,6 @@ class QLearningAgent:
             best_actions = [self.actions[i] for i in range(len(self.actions)) 
                            if q_values[i] == max_q]
             action = random.choice(best_actions)
-            self._exploitation_count += 1
         
         return action
     
@@ -391,15 +374,10 @@ class QLearningAgent:
             # New estimate = old estimate + learning_rate * (immediate_reward + future_value - old_estimate)
             new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
             
-            # Store the updated Q-value
+            # Update Q-value entry
             self.q_table[(prev_state, action)] = new_q
-        
-        # Track learning progress (outside lock — minor inaccuracy is acceptable)
-        self._updates_count += 1
-        if new_q > self._max_q_value:
-            self._max_q_value = new_q
     
-    def update(self, reward: float, state: dict[str, float], done: bool) -> None:
+    def update(self, state: dict[str, float],  reward: float, done: bool) -> None:
         """
         Simpler learning method that uses internally tracked state/action.
         
@@ -407,8 +385,8 @@ class QLearningAgent:
         The agent remembers its last state/action from the previous process_state() call.
         
         Args:
-            reward: The reward received from the previous action (float)
             state: Raw game state (the result of where the previous action led)
+            reward: The reward received from the previous action (float)
             done: Whether the episode ended (bool)
         """
         # If this is the first frame, we have no previous action to learn from
@@ -418,13 +396,14 @@ class QLearningAgent:
         # Validate state before discretizing
         self._validate_state_dict(state)
         
-        # Convert next state from continuous to discrete bins
+        # Convert state from continuous to discrete bins
         state = self._discretize_state(state)
         
         # Update Q-value using the action we took last frame
         self._update_q_value(self._last_state, self._last_action, reward, state, done)
         
         # Clear last state/action at episode end to avoid spurious cross-episode transitions
+        # self._last_state and self._last_action are normally set in process_state
         if done:
             self._last_state = None
             self._last_action = None

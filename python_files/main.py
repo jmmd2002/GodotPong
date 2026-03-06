@@ -1,6 +1,7 @@
 import signal
 import socket
 import json
+import time
 import yaml
 import threading
 from pathlib import Path
@@ -9,15 +10,23 @@ from qlearning_agent import QLearningAgent
 
 # Config files
 QAGENT_CONFIG_PATH = Path(__file__).parent / "config" / "QAgent_config.yaml"
+COACH_CONFIG_PATH = Path(__file__).parent / "config" / "Coach_config.yaml"
 
 HOST = "127.0.0.1"
 BASE_PORT = 5000       # First worker listens here
 NUM_WORKERS = 1        # Set to e.g. 3 to run 3 Godot instances in parallel
 
+# Default model config values (used when config file is missing or invalid)
+DEFAULT_MODEL_PATH = "models/new_q_table.json"
+DEFAULT_LOAD_ON_START = True
+DEFAULT_SAVE_ON_EXIT = True
+DEFAULT_AUTOSAVE_EVERY_N_STEPS = 1000
+DEFAULT_NUM_WORKERS = 1
+
 
 def load_agent() -> tuple[QLearningAgent, dict]:
     """Load Q-learning agent and raw config from config file."""
-    config_path = QAGENT_CONFIG_PATH
+    config_path = QAGENT_CONFIG_PATH #TODO: somehow make this change according to godot
     
     try:
         with open(config_path, 'r') as f:
@@ -29,20 +38,6 @@ def load_agent() -> tuple[QLearningAgent, dict]:
 
     agent = QLearningAgent.from_dict(config)
     return agent, config
-
-
-def print_training_progress(worker_id: int, learning_steps: int, total_games: int,
-                            agent: QLearningAgent, episode_rewards: list) -> None:
-    """Print training progress and learning statistics."""
-    stats = agent.get_stats()
-    avg_reward = sum(episode_rewards[-20:]) / len(episode_rewards[-20:]) if episode_rewards else 0.0
-    
-    print(f"[W{worker_id}|Step {learning_steps:7d}] Games: {total_games:4d} | "
-          f"Q-States: {stats['num_entries']:5d} ({stats['updates']:6d} updates) | "
-          f"Q-Values: avg={stats['avg_q']:7.3f} max={stats['max_q']:7.3f} | "
-          f"Explore: {stats['exploration_rate']:5.1f}% | "
-          f"Reward: {avg_reward:7.2f}")
-
 
 def print_config(agent: QLearningAgent, num_workers: int, autosave_every_n_steps: int) -> None:
     """Print learning configuration at startup."""
@@ -56,6 +51,57 @@ def print_config(agent: QLearningAgent, num_workers: int, autosave_every_n_steps
     print(f"State variables: {agent.state}")
     print(f"Autosave every {autosave_every_n_steps} steps (counted per worker)")
     print(f"=== Starting Training ===\n")
+
+
+def validate_model_config(config) -> dict:
+    """Validate the model config section from the YAML config file.
+    
+    Each field is checked individually. If missing or the wrong type, a warning
+    is printed and the default value is used. Extra fields are ignored.
+    Returns a dict with only the validated fields.
+    """
+    if not isinstance(config, dict):
+        print("[WARNING] 'model' section is missing or invalid in config file. Using all defaults.")
+        config = {
+            "path":                   DEFAULT_MODEL_PATH,
+            "load_on_start":          DEFAULT_LOAD_ON_START,
+            "save_on_exit":           DEFAULT_SAVE_ON_EXIT,
+            "autosave_every_n_steps": DEFAULT_AUTOSAVE_EVERY_N_STEPS,
+            "num_workers":            DEFAULT_NUM_WORKERS,
+        }
+        return config
+
+    def get(key, expected_type, default):
+        value = config.get(key)
+        if not isinstance(value, expected_type):
+            if value is not None:
+                print(f"[WARNING] model.{key} must be {expected_type.__name__}, "
+                      f"got {type(value).__name__}. Using default: {default!r}")
+            else:
+                print(f"[WARNING] model.{key} not set. Using default: {default!r}")
+            return default
+        return value
+
+    path                   = get("path",                   str,  DEFAULT_MODEL_PATH)
+    load_on_start          = get("load_on_start",          bool, DEFAULT_LOAD_ON_START)
+    save_on_exit           = get("save_on_exit",           bool, DEFAULT_SAVE_ON_EXIT)
+    autosave_every_n_steps = get("autosave_every_n_steps", int,  DEFAULT_AUTOSAVE_EVERY_N_STEPS)
+    num_workers            = get("num_workers",            int,  DEFAULT_NUM_WORKERS)
+
+    if autosave_every_n_steps < 0:
+        print(f"[WARNING] model.autosave_every_n_steps must be >= 0. Using default: {DEFAULT_AUTOSAVE_EVERY_N_STEPS}")
+        autosave_every_n_steps = DEFAULT_AUTOSAVE_EVERY_N_STEPS
+    if num_workers < 1:
+        print(f"[WARNING] model.num_workers must be >= 1. Using default: {DEFAULT_NUM_WORKERS}")
+        num_workers = DEFAULT_NUM_WORKERS
+
+    return {
+        "path":                   path,
+        "load_on_start":          load_on_start,
+        "save_on_exit":           save_on_exit,
+        "autosave_every_n_steps": autosave_every_n_steps,
+        "num_workers":            num_workers,
+    }
 
 
 def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
@@ -78,10 +124,6 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
     
     # Per-worker tracking (no sharing needed — each thread owns these)
     learning_steps: int = 0
-    total_games: int = 0
-    current_episode_reward: float = 0.0
-    episode_rewards: list = []
-    debug_print_interval: int = 100
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -94,11 +136,15 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
     conn = None
     try:
         # Wait for a Godot instance to connect (check shutdown_event every second)
+        connection_start_time = time.time()
         while not shutdown_event.is_set():
+            not_connected_timer = time.time() - connection_start_time
             try:
                 conn, addr = server.accept()
                 break
             except socket.timeout:
+                if int(not_connected_timer) % 5 == 0:  # print every 5 seconds while waiting
+                    print(f"[W{worker_id}] Waiting for Godot to connect on port {port}...")
                 continue
         
         if shutdown_event.is_set():
@@ -114,60 +160,41 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
             except socket.timeout:
                 continue  # no data yet, loop and check shutdown_event
 
-            if not data:
+            if not data: #standard way to detect closed connection
                 print(f"[W{worker_id}] Godot disconnected.")
                 break
 
             buffer += data.decode()
 
             while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
+                line, buffer = buffer.split("\n", 1) #split off one line at a time
 
                 try:
                     message: dict = json.loads(line)
-
+                    
                     frame_id = message.get("frame_id")
-                    if frame_id is None:
-                        print(f"[W{worker_id}] Missing frame_id")
-                        continue
-
-                    prev_reward = message.get("prev_reward", 0.0)
-                    done = message.get("done", False)
+                    prev_reward = message.get("prev_reward")
+                    done = message.get("done")
                     current_state = {k: v for k, v in message.items()
                                      if k not in ["frame_id", "prev_reward", "done"]}
+                    #verify_message(frame_id, current_state, prev_reward, done) #TODO #verify the message didnt get corrupted
 
                     # LEARNING: update Q-values (thread-safe inside agent)
-                    agent.update(prev_reward, current_state, done)
+                    agent.update(current_state, prev_reward, done)
                     learning_steps += 1
-                    current_episode_reward += prev_reward
 
-                    if done:
-                        total_games += 1
-                        episode_rewards.append(current_episode_reward)
-                        current_episode_reward = 0.0
-
-                    if learning_steps % debug_print_interval == 0:
-                        print_training_progress(worker_id, learning_steps, total_games,
-                                                agent, episode_rewards)
-
-                    # Autosave: use save_lock so two workers don't write simultaneously
-                    if autosave_every_n_steps > 0 and learning_steps % autosave_every_n_steps == 0:
+                    # Autosave: only worker 0 saves — all workers share the same Q-table
+                    # so saving once is enough; no need for every worker to write the file
+                    if worker_id == 0 and autosave_every_n_steps > 0 and learning_steps % autosave_every_n_steps == 0:
                         with save_lock:
                             try:
                                 agent.save(str(model_path))
-                                print(f"[W{worker_id}|Step {learning_steps}] ✓ Model autosaved")
+                                print(f"[W{worker_id}|Step {learning_steps}] Model autosaved")
                             except Exception as e:
                                 print(f"[W{worker_id}] Autosave failed: {e}")
 
                     # DECISION: pick next action and send back to Godot
-                    # On terminal frames, don't call process_state — the episode is over and
-                    # there is no valid state to act from. Sending STAY avoids setting
-                    # _last_state to the terminal state, which would cause a spurious
-                    # cross-episode Q-update on the very first frame of the next episode.
-                    if done:
-                        action = "STAY"
-                    else:
-                        action = agent.process_state(current_state)
+                    action = agent.process_state(current_state)
                     response = json.dumps({"frame_id": frame_id, "action": action}) + "\n"
                     conn.sendall(response.encode())
 
@@ -177,7 +204,6 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                     print(f"[W{worker_id}] Decode error: {e}")
                 except ValueError as e:
                     print(f"[W{worker_id}] State validation error: {e}")
-
     finally:
         if conn:
             conn.close()
@@ -189,12 +215,12 @@ def main():
     """Start all workers and wait for Ctrl+C."""
     agent, config = load_agent()
 
-    model_config: dict = config.get("model", {})
-    model_path = Path(__file__).parent / model_config.get("path", "models/q_table.json")
-    load_on_start: bool = model_config.get("load_on_start", True)
-    save_on_exit: bool = model_config.get("save_on_exit", True)
-    autosave_every_n_steps: int = int(model_config.get("autosave_every_n_steps", 1000))
-    num_workers: int = int(model_config.get("num_workers", NUM_WORKERS))
+    model_config: dict = validate_model_config(config.get("model"))
+    model_path: Path = Path(__file__).parent / model_config.get("path")
+    load_on_start: bool = model_config.get("load_on_start")
+    save_on_exit: bool = model_config.get("save_on_exit")
+    autosave_every_n_steps: int = int(model_config.get("autosave_every_n_steps"))
+    num_workers: int = int(model_config.get("num_workers"))
 
     if load_on_start and model_path.exists():
         try:
@@ -203,7 +229,7 @@ def main():
         except Exception as e:
             print(f"Failed to load model: {e}")
     elif load_on_start:
-        print(f"No existing model at {model_path}. Starting fresh.")
+        print(f"No existing model at {model_path}. Starting fresh at {model_path}.")
 
     print_config(agent, num_workers, autosave_every_n_steps)
 
@@ -212,7 +238,7 @@ def main():
     # save_lock: prevents two workers from writing the model file at the same time
     save_lock = threading.Lock()
 
-    threads = []
+    threads: list[threading.Thread] = []
     for i in range(num_workers):
         t = threading.Thread(
             target=worker,
