@@ -7,6 +7,7 @@ This agent learns to play Pong using Q-learning with value iteration.
 import random
 import ast
 import json
+import math
 import tempfile
 import os
 import threading
@@ -82,6 +83,12 @@ class QLearningAgent:
         self._exploration_count = 0
         self._exploitation_count = 0
         self._max_q_value = 0.0
+
+        # Total possible (state, action) pairs — used to compute q_coverage
+        total_states = 1
+        for num_bins in self.bins_config.values():
+            total_states *= num_bins
+        self._total_state_action_pairs = total_states * len(self.actions)
         
         print("Q-Learning Agent initialized")
         print(f"State variables: {self.state}")
@@ -295,6 +302,7 @@ class QLearningAgent:
         if random.random() < self.epsilon:
             # EXPLORE: Pick a random action
             action = random.choice(self.actions)
+            self._exploration_count += 1
         else:
             # EXPLOIT: Pick the action with the highest Q-value in this state
             # Lock the Q-table so another thread doesn't modify it mid-read
@@ -305,6 +313,7 @@ class QLearningAgent:
             best_actions = [self.actions[i] for i in range(len(self.actions)) 
                            if q_values[i] == max_q]
             action = random.choice(best_actions)
+            self._exploitation_count += 1
         
         return action
     
@@ -376,6 +385,7 @@ class QLearningAgent:
             
             # Update Q-value entry
             self.q_table[(prev_state, action)] = new_q
+            self._updates_count += 1
     
     def update(self, state: dict[str, float],  reward: float, done: bool) -> None:
         """
@@ -464,6 +474,8 @@ class QLearningAgent:
             - avg_q: Average Q-value
             - max_q: Highest Q-value
             - min_q: Lowest Q-value
+            - std_q: Standard deviation of Q-values (rises as learning diverges from 0)
+            - q_coverage: Percentage of total state-action space visited (0-100%)
             - updates: Total number of Q-value updates
             - exploration_rate: Percentage of actions that were explorations
         """
@@ -472,15 +484,21 @@ class QLearningAgent:
                 "num_entries": 0,
                 "avg_q": 0.0,
                 "max_q": 0.0,
-                "min_q": 0.0
+                "min_q": 0.0,
+                "std_q": 0.0,
+                "q_coverage": 0.0,
             }
         else:
             q_values = list(self.q_table.values())
+            avg_q = sum(q_values) / len(q_values)
+            variance = sum((v - avg_q) ** 2 for v in q_values) / len(q_values)
             stats = {
                 "num_entries": len(self.q_table),
-                "avg_q": sum(q_values) / len(q_values),
+                "avg_q": avg_q,
                 "max_q": max(q_values),
-                "min_q": min(q_values)
+                "min_q": min(q_values),
+                "std_q": math.sqrt(variance),
+                "q_coverage": len(self.q_table) / self._total_state_action_pairs * 100,
             }
         
         # Add learning progress stats

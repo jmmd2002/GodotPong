@@ -6,6 +6,8 @@ import yaml
 import threading
 from pathlib import Path
 from qlearning_agent import QLearningAgent
+from stats_logger import QLearningStatsLogger
+from live_plotter import QLearningLivePlotter
 
 
 # Config files
@@ -22,6 +24,9 @@ DEFAULT_LOAD_ON_START = True
 DEFAULT_SAVE_ON_EXIT = True
 DEFAULT_AUTOSAVE_EVERY_N_STEPS = 1000
 DEFAULT_NUM_WORKERS = 1
+DEFAULT_LOG_EVERY_N_STEPS = 100   # 0 disables stats logging
+DEFAULT_LOG_PATH = "logs/training_log.csv"
+DEFAULT_REWARD_WINDOW = 20        # Episodes used to compute avg reward
 
 
 def load_agent() -> tuple[QLearningAgent, dict]:
@@ -104,9 +109,52 @@ def validate_model_config(config) -> dict:
     }
 
 
+def validate_log_config(config) -> dict:
+    """Validate the logs config section from the YAML config file.
+
+    Each field is checked individually. If missing or the wrong type, a warning
+    is printed and the default value is used. Extra fields are ignored.
+    Returns a dict with only the validated fields.
+    """
+    if not isinstance(config, dict):
+        print("[WARNING] 'logs' section is missing or invalid in config file. Using all defaults.")
+        config = {}
+
+    def get(key, expected_type, default):
+        value = config.get(key)
+        if not isinstance(value, expected_type):
+            if value is not None:
+                print(f"[WARNING] logs.{key} must be {expected_type.__name__}, "
+                      f"got {type(value).__name__}. Using default: {default!r}")
+            else:
+                print(f"[WARNING] logs.{key} not set. Using default: {default!r}")
+            return default
+        return value
+
+    log_every_n_steps = get("log_every_n_steps", int, DEFAULT_LOG_EVERY_N_STEPS)
+    log_path          = get("log_path",          str, DEFAULT_LOG_PATH)
+    reward_window     = get("reward_window",     int, DEFAULT_REWARD_WINDOW)
+
+    if log_every_n_steps < 0:
+        print(f"[WARNING] logs.log_every_n_steps must be >= 0. Using default: {DEFAULT_LOG_EVERY_N_STEPS}")
+        log_every_n_steps = DEFAULT_LOG_EVERY_N_STEPS
+    if reward_window < 1:
+        print(f"[WARNING] logs.reward_window must be >= 1. Using default: {DEFAULT_REWARD_WINDOW}")
+        reward_window = DEFAULT_REWARD_WINDOW
+
+    return {
+        "log_every_n_steps": log_every_n_steps,
+        "log_path":          log_path,
+        "reward_window":     reward_window,
+    }
+
+
 def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
            autosave_every_n_steps: int, save_lock: threading.Lock,
-           shutdown_event: threading.Event) -> None:
+           shutdown_event: threading.Event,
+           stats_logger: QLearningStatsLogger | None = None,
+           log_every_n_steps: int = 0,
+           reward_window: int = 20) -> None:
     """
     Handles one Godot connection on its own port.
     
@@ -124,6 +172,9 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
     
     # Per-worker tracking (no sharing needed — each thread owns these)
     learning_steps: int = 0
+    total_games: int = 0
+    current_episode_reward: float = 0.0
+    episode_rewards: list[float] = []
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -183,6 +234,16 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                     agent.update(current_state, prev_reward, done)
                     learning_steps += 1
 
+                    # Stats for logging: update episode reward and total games
+                    if prev_reward is not None:
+                        current_episode_reward += prev_reward
+                    if done:
+                        total_games += 1
+                        episode_rewards.append(current_episode_reward)
+                        if len(episode_rewards) > reward_window:
+                            episode_rewards.pop(0)
+                        current_episode_reward = 0.0
+
                     # Autosave: only worker 0 saves — all workers share the same Q-table
                     # so saving once is enough; no need for every worker to write the file
                     if worker_id == 0 and autosave_every_n_steps > 0 and learning_steps % autosave_every_n_steps == 0:
@@ -192,6 +253,16 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                                 print(f"[W{worker_id}|Step {learning_steps}] Model autosaved")
                             except Exception as e:
                                 print(f"[W{worker_id}] Autosave failed: {e}")
+
+                    # Stats logging: all workers record episode rewards;
+                    # only worker 0 supplies Q-table stats (others pass {})
+                    if (stats_logger is not None
+                            and log_every_n_steps > 0
+                            and learning_steps % log_every_n_steps == 0):
+                        avg_reward = (sum(episode_rewards) / len(episode_rewards)
+                                      if episode_rewards else 0.0)
+                        agent_stats = agent.get_stats() if worker_id == 0 else {}
+                        stats_logger.record(worker_id, learning_steps, total_games, avg_reward, agent_stats)
 
                     # DECISION: pick next action and send back to Godot
                     action = agent.process_state(current_state)
@@ -204,6 +275,8 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                     print(f"[W{worker_id}] Decode error: {e}")
                 except ValueError as e:
                     print(f"[W{worker_id}] State validation error: {e}")
+                except Exception as e:
+                    print(f"[W{worker_id}] Unknown error, skipping step: {e}")
     finally:
         if conn:
             conn.close()
@@ -222,6 +295,11 @@ def main():
     autosave_every_n_steps: int = int(model_config.get("autosave_every_n_steps"))
     num_workers: int = int(model_config.get("num_workers"))
 
+    log_config: dict = validate_log_config(config.get("logs"))
+    log_every_n_steps: int = log_config.get("log_every_n_steps")
+    log_path: Path = Path(__file__).parent / log_config.get("log_path")
+    reward_window: int = log_config.get("reward_window")
+
     if load_on_start and model_path.exists():
         try:
             agent.load(str(model_path))
@@ -238,11 +316,21 @@ def main():
     # save_lock: prevents two workers from writing the model file at the same time
     save_lock = threading.Lock()
 
+    # Stats logger (worker 0 records into it; main saves CSV on exit)
+    stats_logger = QLearningStatsLogger()
+
+    # Live plot thread (reads from stats_logger, redraws every 5s)
+    plotter = QLearningLivePlotter(stats_logger, refresh_interval=5.0, reward_window=reward_window)
+    plotter.start(shutdown_event)
+
     threads: list[threading.Thread] = []
     for i in range(num_workers):
         t = threading.Thread(
             target=worker,
-            args=(i, agent, model_path, autosave_every_n_steps, save_lock, shutdown_event),
+            args=(i, agent, model_path, autosave_every_n_steps, save_lock, shutdown_event,
+                  stats_logger,
+                  log_every_n_steps,
+                  reward_window),
             daemon=True,
             name=f"worker-{i}"
         )
@@ -267,6 +355,7 @@ def main():
                     print("Final model saved.")
                 except Exception as e:
                     print(f"Failed to save model: {e}")
+        stats_logger.save_csv(log_path)
         print("Done.")
 
 
