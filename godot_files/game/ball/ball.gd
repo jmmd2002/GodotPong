@@ -2,6 +2,7 @@ extends Node2D
 
 @export var ball_radius: float = 16.0 #ball sprite is 32x32
 @export var speed: float = 400.0
+@export var max_speed: float = 1600.0
 @export var max_angle: float = PI/3
 
 var velocity: Vector2 = Vector2(0.0,0.0)
@@ -21,6 +22,14 @@ func _process(delta):
 	for _i in range(num_steps):
 		position += velocity * sub_delta
 		handle_collisions()
+
+	# Guard: respawn ball if it has escaped the viewport (physics edge case)
+	var vp: Rect2 = get_viewport_rect()
+	if position.x < vp.position.x or position.x > vp.end.x or \
+	   position.y < vp.position.y or position.y > vp.end.y:
+		print("Warning: ball escaped viewport at ", position, ". Respawning.")
+		queue_free()
+		Dispatcher.emit_ball_destroyed()
 	return
 	
 func _reset_ball():
@@ -69,6 +78,7 @@ func handle_collisions() -> void:
 			var dir: int = 1 if velocity.x < 0 else -1
 			
 			speed *= 1.1 #accelerate ball after collision
+			speed = min(speed, max_speed) #cap speed
 			velocity = dir * Vector2(1.0,0).rotated(-dir * angle) * speed
 	return
 	

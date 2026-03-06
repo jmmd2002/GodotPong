@@ -26,7 +26,7 @@ var game_manager: Node
 @onready var viewport_size: Vector2 = get_viewport().size
 @onready var max_x: float = viewport_size.x
 @onready var max_y: float = viewport_size.y
-@onready var max_speed: float = 3200
+@onready var max_speed: float = 1600
 
 func _ready() -> void:
 	# Allow port to be overridden via command-line: godot -- --port 5001

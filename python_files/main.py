@@ -160,7 +160,14 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                                 print(f"[W{worker_id}] Autosave failed: {e}")
 
                     # DECISION: pick next action and send back to Godot
-                    action = agent.process_state(current_state)
+                    # On terminal frames, don't call process_state — the episode is over and
+                    # there is no valid state to act from. Sending STAY avoids setting
+                    # _last_state to the terminal state, which would cause a spurious
+                    # cross-episode Q-update on the very first frame of the next episode.
+                    if done:
+                        action = "STAY"
+                    else:
+                        action = agent.process_state(current_state)
                     response = json.dumps({"frame_id": frame_id, "action": action}) + "\n"
                     conn.sendall(response.encode())
 

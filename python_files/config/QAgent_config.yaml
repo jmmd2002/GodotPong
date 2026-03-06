@@ -29,7 +29,7 @@ actions:
 hyperparameters:
   alpha: 0.05      # Learning rate: how much we update Q-values (0 to 1)
   gamma: 0.99      # Discount factor: 1.0 = no discounting; valid for finite episodic tasks
-  epsilon: 0.1  # Exploration rate: probability of random action (0 to 1)
+  epsilon: 0.05  # Exploration rate: probability of random action (0 to 1)
 
 # Model persistence settings
 model:
@@ -37,4 +37,4 @@ model:
   load_on_start: true               # Load existing model if file exists
   save_on_exit: true                # Save model when server shuts down
   autosave_every_n_steps: 100      # 0 disables autosave during runtime
-  num_workers: 10                    # Number of parallel Godot instances (ports BASE_PORT to BASE_PORT+N-1)
+  num_workers: 20                   # Number of parallel Godot instances (ports BASE_PORT to BASE_PORT+N-1)
