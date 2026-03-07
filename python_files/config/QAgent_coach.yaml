@@ -34,8 +34,8 @@ model:
   path: models/q_table_coach.json         # Relative to python_files/
   load_on_start: true               # Load existing model if file exists
   save_on_exit: true                # Save model when server shuts down
-  autosave_every_n_steps: 100       # 0 disables autosave during runtime
-  num_workers: 100        # Number of parallel Godot instances (ports BASE_PORT to BASE_PORT+N-1)
+  autosave_every_n_steps: 1000       # 0 disables autosave during runtime
+  num_workers: 2      # Number of parallel Godot instances (ports BASE_PORT to BASE_PORT+N-1)
 
 # Logging / monitoring settings
 logs:

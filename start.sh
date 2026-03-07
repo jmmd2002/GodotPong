@@ -30,7 +30,7 @@ PYTHON_PID=$!
 echo "Python started (PID: $PYTHON_PID)"
 
 # Give Python a moment to bind its sockets before Godot connects
-sleep 0.5
+sleep 0.1
 
 # Launch one Godot instance per worker, each on its own port.
 # A 1s pause between launches lets you identify which window is worker 0.

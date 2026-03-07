@@ -52,9 +52,8 @@ func get_direction() -> int:
 	if q_table.is_empty():
 		return 0
 
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	var max_x: float = viewport_size.x
-	var max_y: float = viewport_size.y
+	var max_x: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1280)
+	var max_y: float = ProjectSettings.get_setting("display/window/size/viewport_height", 720)
 
 	# The coach was trained from the left side (PaddleA perspective).
 	# Mirror ball_x and ball_vx when playing on the right so the state matches.

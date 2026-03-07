@@ -5,7 +5,10 @@ extends Node2D
 var paddle_a: Node2D
 
 func _ready() -> void:
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var viewport_size: Vector2 = Vector2(
+		ProjectSettings.get_setting("display/window/size/viewport_width", 1280),
+		ProjectSettings.get_setting("display/window/size/viewport_height", 720)
+	)
 
 	paddle_a = $PaddleA
 	paddle_a.position = Vector2(40.0, viewport_size.y / 2)

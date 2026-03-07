@@ -244,6 +244,7 @@ class QLearningAgent:
             if not isinstance(value, (int, float)):
                 raise ValueError(f"State value for '{key}' must be numeric, got {type(value).__name__}.")
             if value < -1.0 or value > 1.0:
+                pass
                 print(
                     f"Warning: State value for '{key}' out of range: {value}. Clamping to [-1, 1]."
                 )
@@ -544,7 +545,7 @@ class QLearningAgent:
                 "max_q": max(q_values),
                 "min_q": min(q_values),
                 "std_q": math.sqrt(variance),
-                "q_coverage": unique_states / self._total_states * 100,
+                "q_coverage": len(q_snapshot) / self._total_state_action_pairs * 100,
             }
         
         # Add learning progress stats

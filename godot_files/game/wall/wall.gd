@@ -1,7 +1,10 @@
 extends StaticBody2D
 
 @export var thickness: float = 20.0
-@onready var viewport_size: Vector2 = get_viewport_rect().size
+var viewport_size: Vector2 = Vector2(
+	ProjectSettings.get_setting("display/window/size/viewport_width", 1280),
+	ProjectSettings.get_setting("display/window/size/viewport_height", 720)
+)
 
 func _initialize():
 	# Resize the CollisionShape2D

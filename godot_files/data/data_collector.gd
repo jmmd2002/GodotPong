@@ -24,11 +24,7 @@ var paddleA: Node2D
 var paddleB: Node2D
 var game_manager: Node
 
-#normalization values
-@onready var viewport_size: Vector2 = get_viewport().size
-@onready var max_x: float = viewport_size.x
-@onready var max_y: float = viewport_size.y
-#For headless mode
+#normalization values (hardcoded to match project settings — safe for headless mode)
 var max_x: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1280)
 var max_y: float = ProjectSettings.get_setting("display/window/size/viewport_height", 720)
 @onready var max_speed: float = 1600

@@ -25,7 +25,9 @@ func _process(delta):
 			return  # ball was destroyed by a kill zone, stop processing
 
 	# Guard: respawn ball if it has escaped the viewport (physics edge case)
-	var vp: Rect2 = get_viewport_rect()
+	var _vp_w: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1280)
+	var _vp_h: float = ProjectSettings.get_setting("display/window/size/viewport_height", 720)
+	var vp: Rect2 = Rect2(0.0, 0.0, _vp_w, _vp_h)
 	if position.x < vp.position.x or position.x > vp.end.x or \
 	   position.y < vp.position.y or position.y > vp.end.y:
 		print("Warning: ball escaped viewport at ", position, ". Respawning.")
@@ -42,7 +44,11 @@ func _reset_ball():
 	# Set size and collision mask
 	$Sprite2D.scale = ball_size / $Sprite2D.texture.get_size()
 	$CollisionShape2D.shape = ball_mask
-	global_position = get_viewport_rect().size / 2
+	var _vp_size: Vector2 = Vector2(
+		ProjectSettings.get_setting("display/window/size/viewport_width", 1280),
+		ProjectSettings.get_setting("display/window/size/viewport_height", 720)
+	)
+	global_position = _vp_size / 2
 	velocity = Vector2.ZERO
 	
 func launch_ball() -> void:

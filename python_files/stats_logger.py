@@ -44,7 +44,21 @@ class StatsLogger:
 
     def __init__(self) -> None:
         self._buffer: list[dict] = []
+        self._episode_rewards: list[float] = []
         self._lock = threading.Lock()
+
+    def add_episode_reward(self, reward: float, window: int) -> None:
+        """Append a completed episode's reward to the shared pool (thread-safe)."""
+        with self._lock:
+            self._episode_rewards.append(reward)
+            if len(self._episode_rewards) > window:
+                self._episode_rewards.pop(0)
+
+    def avg_episode_reward(self) -> float:
+        """Return the mean reward over the current pool (thread-safe)."""
+        with self._lock:
+            pool = list(self._episode_rewards)
+        return sum(pool) / len(pool) if pool else 0.0
 
     def _build_extra_row(self, stats: dict) -> dict:
         """

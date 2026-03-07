@@ -94,7 +94,8 @@ class QLearningLivePlotter:
 
         plt.close(fig)
 
-    def _redraw(self, fig, ax_reward, ax_qtable, ax_qtable_r, ax_qval, ax_explore) -> None:
+    def _redraw(self, fig: plt.Figure, ax_reward: plt.Axes, ax_qtable: plt.Axes, 
+                ax_qtable_r: plt.Axes, ax_qval: plt.Axes, ax_explore: plt.Axes) -> None:
         """Pull latest data from the logger and redraw all subplots."""
         with self._logger._lock:
             snapshot = list(self._logger._buffer)
@@ -113,17 +114,15 @@ class QLearningLivePlotter:
         # Color cycle: one colour per worker
         colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
-        # --- Avg reward: one line per worker ---
+        # --- Avg reward: pooled across all workers, recorded by worker 0 ---
         ax_reward.cla()
-        ax_reward.set_title(f"Avg Reward (window={self._reward_window} eps)")
+        ax_reward.set_title(f"Avg Reward (pooled, window={self._reward_window} eps)")
         ax_reward.set_xlabel("Step")
         ax_reward.set_ylabel("Reward")
-        for wid, rows in sorted(by_worker.items()):
-            steps = [r["step"] for r in rows]
-            rewards = [r["avg_reward"] for r in rows]
-            ax_reward.plot(steps, rewards, color=colors[wid % len(colors)], label=f"W{wid}")
-        if len(by_worker) > 1:
-            ax_reward.legend(fontsize=8)
+        if w0_rows:
+            steps = [r["step"] for r in w0_rows]
+            rewards = [r["avg_reward"] for r in w0_rows]
+            ax_reward.plot(steps, rewards, color=colors[0])
 
         if len(w0_rows) < 2:
             fig.tight_layout(pad=3.0)
@@ -161,9 +160,9 @@ class QLearningLivePlotter:
         )
         ax_qval.legend(fontsize=8)
 
-        # --- Exploration rate (worker 0 only) ---
+        # --- Exploration rate (global across all workers) ---
         ax_explore.cla()
-        ax_explore.set_title("Exploration Rate (W0)")
+        ax_explore.set_title("Exploration Rate (global)")
         ax_explore.set_xlabel("Step")
         ax_explore.set_ylabel("%")
         ax_explore.plot(steps0, explore_rate, color="tab:red")

@@ -21,9 +21,12 @@ var paddleA: Node2D
 var game_manager: Node
 
 #normalization values
-@onready var viewport_size: Vector2 = get_viewport().size
-@onready var max_x: float = viewport_size.x
-@onready var max_y: float = viewport_size.y
+#@onready var viewport_size: Vector2 = get_viewport().size
+#@onready var max_x: float = viewport_size.x
+#@onready var max_y: float = viewport_size.y
+#For headless mode
+var max_x: float = 1280
+var max_y: float = 720
 @onready var max_speed: float = 1600
 
 func _ready() -> void:
@@ -132,6 +135,7 @@ func normalize_state(state: Dictionary) -> Dictionary:
 		"prev_reward": state.get("prev_reward", 0.0),
 		"done": state.get("done", false)
 	}
+	#print(max_x, max_y)
 	return state
 
 func receive_action(expected_frame_id: int) -> String:

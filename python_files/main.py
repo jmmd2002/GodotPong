@@ -208,13 +208,14 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
     
     Each worker runs in its own thread. It has its own:
       - TCP server socket on BASE_PORT + worker_id
-      - learning_steps / total_games / episode_rewards counters
+      - learning_steps / total_games counters
       - current_episode_reward tracker
     
     It shares with other workers:
       - agent (Q-table is protected by agent._lock)
       - model_path / save_lock (so two workers don't save simultaneously)
       - shutdown_event (Ctrl+C from any thread signals all workers to stop)
+      - stats_logger (holds the shared episode reward pool + log buffer)
     """
     port = BASE_PORT + worker_id
     
@@ -222,7 +223,6 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
     learning_steps: int = 0
     total_games: int = 0
     current_episode_reward: float = 0.0
-    episode_rewards: list[float] = []
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -308,9 +308,8 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                         current_episode_reward += prev_reward
                     if done:
                         total_games += 1
-                        episode_rewards.append(current_episode_reward)
-                        if len(episode_rewards) > reward_window:
-                            episode_rewards.pop(0)
+                        if stats_logger is not None:
+                            stats_logger.add_episode_reward(current_episode_reward, reward_window)
                         current_episode_reward = 0.0
 
                     # Autosave: only worker 0 saves — all workers share the same Q-table
@@ -323,15 +322,14 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                             except Exception as e:
                                 print(f"[W{worker_id}] Autosave failed: {e}")
 
-                    # Stats logging: all workers record episode rewards;
-                    # only worker 0 supplies Q-table stats (others pass {})
-                    if (stats_logger is not None
+                    # Stats logging: only worker 0 logs, using the shared reward pool
+                    # so avg_reward reflects all workers' episodes, not just one worker's window
+                    if (worker_id == 0
+                            and stats_logger is not None
                             and log_every_n_steps > 0
                             and learning_steps % log_every_n_steps == 0):
-                        avg_reward = (sum(episode_rewards) / len(episode_rewards)
-                                      if episode_rewards else 0.0)
-                        agent_stats = agent.get_stats() if worker_id == 0 else {}
-                        stats_logger.record(worker_id, learning_steps, total_games, avg_reward, agent_stats)
+                        avg_reward = stats_logger.avg_episode_reward()
+                        stats_logger.record(worker_id, learning_steps, total_games, avg_reward, agent.get_stats())
 
                     # DECISION: pick next action and send back to Godot
                     action = agent.process_state(current_state)
@@ -387,6 +385,7 @@ def main():
     save_lock = threading.Lock()
 
     # Stats logger (worker 0 records into it; main saves CSV on exit)
+    # Also holds the shared episode reward pool across all workers.
     stats_logger = QLearningStatsLogger()
 
     # Start all workers FIRST so every port is bound before matplotlib

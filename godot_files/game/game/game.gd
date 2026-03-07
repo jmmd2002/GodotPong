@@ -3,7 +3,10 @@ extends Node2D
 @export var ball_scene: PackedScene
 
 func _ready() -> void:
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var viewport_size: Vector2 = Vector2(
+		ProjectSettings.get_setting("display/window/size/viewport_width", 1280),
+		ProjectSettings.get_setting("display/window/size/viewport_height", 720)
+	)
 
 	$PaddleA.position = Vector2(40.0, viewport_size.y / 2)
 	$PaddleB.position = Vector2(viewport_size.x - 40.0, viewport_size.y / 2)
