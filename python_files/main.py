@@ -21,6 +21,7 @@ CONFIG_MAP: dict[str, Path] = {
 HOST = "127.0.0.1"
 BASE_PORT = 5000       # First worker listens here
 NUM_WORKERS = 1        # Set to e.g. 3 to run 3 Godot instances in parallel
+HEARTBEAT_TIMEOUT = 60.0  # seconds; warn if no message received from a worker
 
 # Default model config values (used when config file is missing or invalid)
 DEFAULT_MODEL_PATH = "models/new_q_table.json"
@@ -256,11 +257,15 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
         print(f"[W{worker_id}] Connected by {addr}")
         conn.settimeout(1.0)
         buffer = ""
+        last_seen: float = time.time()
 
         while not shutdown_event.is_set():
             try:
                 data = conn.recv(1024)
             except socket.timeout:
+                if time.time() - last_seen > HEARTBEAT_TIMEOUT:
+                    print(f"[W{worker_id}] WARNING: No message received for {HEARTBEAT_TIMEOUT:.0f}s. Worker may be stalled.")
+                    last_seen = time.time()  # reset to avoid spamming
                 continue  # no data yet, loop and check shutdown_event
 
             if not data: #standard way to detect closed connection
@@ -278,8 +283,15 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                     # Skip handshake messages (sent by each Godot instance on connect)
                     if message.get("type") == "handshake":
                         print(f"[W{worker_id}] Handshake received: training_mode='{message.get('training_mode')}'")
+                        last_seen = time.time()
                         continue
 
+                    # Heartbeat: just update last_seen and skip learning
+                    if message.get("type") == "heartbeat":
+                        last_seen = time.time()
+                        continue
+
+                    last_seen = time.time()
                     frame_id = message.get("frame_id")
                     prev_reward = message.get("prev_reward")
                     done = message.get("done")
@@ -307,7 +319,7 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
                         with save_lock:
                             try:
                                 agent.save(str(model_path))
-                                print(f"[W{worker_id}|Step {learning_steps}] Model autosaved")
+                                #print(f"[W{worker_id}|Step {learning_steps}] Model autosaved")
                             except Exception as e:
                                 print(f"[W{worker_id}] Autosave failed: {e}")
 

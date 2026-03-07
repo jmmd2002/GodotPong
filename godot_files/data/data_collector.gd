@@ -7,6 +7,8 @@ var incoming_buffer: String = ""
 var last_action: String = "STAY"
 var next_frame_id: int = 0
 const RECONNECT_INTERVAL: float = 1.0  # seconds
+const HEARTBEAT_INTERVAL: float = 3.0  # seconds between heartbeat pings
+var heartbeat_timer: float = 0.0
 
 # Set a different port for each Godot instance in the Inspector (5000, 5001, 5002...)
 @export var port: int = 5000
@@ -49,14 +51,20 @@ func _process(delta: float):
 			reconnect_timer = 0
 			try_connect()
 	else:
+		heartbeat_timer += delta
 		var sent_frame_id: int = send_state()
 		if sent_frame_id != -1:
+			heartbeat_timer = 0.0
 			var action: String = receive_action(sent_frame_id)
 			if not action.is_empty():
 				last_action = action
 				apply_action(last_action)
 			else:
 				print("Warning: No action received. Keeping last action: ", last_action)
+		elif heartbeat_timer >= HEARTBEAT_INTERVAL:
+			heartbeat_timer = 0.0
+			var hb: String = JSON.stringify({"type": "heartbeat"}) + "\n"
+			client.put_data(hb.to_utf8_buffer())
 
 func try_connect():
 	var err: Error = client.connect_to_host("127.0.0.1", port)

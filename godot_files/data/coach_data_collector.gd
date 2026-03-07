@@ -7,6 +7,8 @@ var incoming_buffer: String = ""
 var last_action: String = "STAY"
 var next_frame_id: int = 0
 const RECONNECT_INTERVAL: float = 1.0
+const HEARTBEAT_INTERVAL: float = 3.0  # seconds between heartbeat pings
+var heartbeat_timer: float = 0.0
 
 @export var port: int = 5000
 
@@ -19,10 +21,10 @@ var paddleA: Node2D
 var game_manager: Node
 
 #normalization values
-# Use ProjectSettings so headless mode gets the correct design resolution
-var max_x: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1280)
-var max_y: float = ProjectSettings.get_setting("display/window/size/viewport_height", 720)
-var max_speed: float = 1600
+@onready var viewport_size: Vector2 = get_viewport().size
+@onready var max_x: float = viewport_size.x
+@onready var max_y: float = viewport_size.y
+@onready var max_speed: float = 1600
 
 func _ready() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -41,14 +43,20 @@ func _process(delta: float):
 			reconnect_timer = 0
 			try_connect()
 	else:
+		heartbeat_timer += delta
 		var sent_frame_id: int = send_state()
 		if sent_frame_id != -1:
+			heartbeat_timer = 0.0
 			var action: String = receive_action(sent_frame_id)
 			if not action.is_empty():
 				last_action = action
 				apply_action(last_action)
 			else:
 				print("Warning: No action received. Keeping last action: ", last_action)
+		elif heartbeat_timer >= HEARTBEAT_INTERVAL:
+			heartbeat_timer = 0.0
+			var hb: String = JSON.stringify({"type": "heartbeat"}) + "\n"
+			client.put_data(hb.to_utf8_buffer())
 
 func try_connect():
 	var err: Error = client.connect_to_host("127.0.0.1", port)
