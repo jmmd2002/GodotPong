@@ -69,15 +69,25 @@ func handle_collisions() -> bool:
 
 	var wall: Node = check_wall_collision()
 	if wall:
-		var wall_center_y: float = wall.global_position.y
+		var wall_rect: Rect2 = Utils.get_global_rect(wall.get_node("CollisionShape2D"))
+		var ball_rect: Rect2 = Utils.get_global_rect($CollisionShape2D)
+		var wall_center_y: float = wall_rect.get_center().y
 		# Only reflect if moving toward the wall, not away from it
 		if (global_position.y < wall_center_y and velocity.y > 0) or \
 		   (global_position.y > wall_center_y and velocity.y < 0):
 			velocity.y = -velocity.y
+			# Position correction: eject ball to just outside the wall so it
+			# cannot sink deeper through the wall over subsequent sub-steps
+			if global_position.y <= wall_center_y:
+				position.y = wall_rect.position.y - ball_rect.size.y / 2.0
+			else:
+				position.y = wall_rect.end.y + ball_rect.size.y / 2.0
 
 	var side_wall: Node = check_side_wall_collision()
 	if side_wall:
-		var wall_center_x: float = side_wall.global_position.x
+		var sw_rect: Rect2 = Utils.get_global_rect(side_wall.get_node("CollisionShape2D"))
+		var ball_rect2: Rect2 = Utils.get_global_rect($CollisionShape2D)
+		var wall_center_x: float = sw_rect.get_center().x
 		# Only reflect if moving toward the wall
 		if (wall_center_x < position.x and velocity.x < 0) or \
 		   (wall_center_x > position.x and velocity.x > 0):
@@ -85,6 +95,11 @@ func handle_collisions() -> bool:
 			var angle: float = randf_range(-max_angle, max_angle)
 			var dir: float = -sign(velocity.x)
 			velocity = Vector2(dir, 0.0).rotated(angle) * speed
+			# Position correction: eject ball to just outside the side wall
+			if position.x >= wall_center_x:
+				position.x = sw_rect.end.x + ball_rect2.size.x / 2.0
+			else:
+				position.x = sw_rect.position.x - ball_rect2.size.x / 2.0
 		
 	var paddle: Node = check_paddle_collision()
 	if paddle:

@@ -519,7 +519,10 @@ class QLearningAgent:
             - updates: Total number of Q-value updates
             - exploration_rate: Percentage of actions that were explorations
         """
-        if not self.q_table:
+        with self._lock:
+            q_snapshot = list(self.q_table.items())
+
+        if not q_snapshot:
             stats = {
                 "num_entries": 0,
                 "num_states": 0,
@@ -530,12 +533,12 @@ class QLearningAgent:
                 "q_coverage": 0.0,
             }
         else:
-            q_values = list(self.q_table.values())
+            q_values = [v for _, v in q_snapshot]
             avg_q = sum(q_values) / len(q_values)
             variance = sum((v - avg_q) ** 2 for v in q_values) / len(q_values)
-            unique_states = len(set(s for s, _a in self.q_table.keys()))
+            unique_states = len(set(s for s, _a in q_snapshot))
             stats = {
-                "num_entries": len(self.q_table),
+                "num_entries": len(q_snapshot),
                 "num_states": unique_states,
                 "avg_q": avg_q,
                 "max_q": max(q_values),

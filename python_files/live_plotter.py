@@ -64,11 +64,11 @@ class QLearningLivePlotter:
         ax_reward.set_xlabel("Step")
         ax_reward.set_ylabel("Reward")
 
-        ax_qtable.set_title("Q-Table Size & Coverage")
+        ax_qtable.set_title("Q-Table Coverage")
         ax_qtable.set_xlabel("Step")
-        ax_qtable.set_ylabel("States", color="tab:blue")
+        ax_qtable.set_ylabel("Coverage %")
         ax_qtable_r = ax_qtable.twinx()
-        ax_qtable_r.set_ylabel("Coverage %", color="tab:orange")
+        ax_qtable_r.set_visible(False)
 
         ax_qval.set_title("Q-Values")
         ax_qval.set_xlabel("Step")
@@ -137,15 +137,15 @@ class QLearningLivePlotter:
         std_q        = [r["std_q"]            for r in w0_rows]
         explore_rate = [r["exploration_rate"] for r in w0_rows]
 
-        # --- Q-table size & coverage (worker 0 only) ---
+        # --- Q-table coverage (worker 0 only) ---
         ax_qtable.cla()
         ax_qtable_r.cla()
-        ax_qtable.set_title("Q-Table Size & Coverage (W0)")
+        ax_qtable_r.set_visible(False)
+        ax_qtable.set_title("Q-Table Coverage (W0)")
         ax_qtable.set_xlabel("Step")
-        ax_qtable.set_ylabel("States", color="tab:blue")
-        ax_qtable_r.set_ylabel("Coverage %", color="tab:orange")
-        ax_qtable.plot(steps0, q_states, color="tab:blue", label="Q-states")
-        ax_qtable_r.plot(steps0, q_coverage, color="tab:orange", linestyle="--", label="Coverage %")
+        ax_qtable.set_ylabel("Coverage %")
+        ax_qtable.set_ylim(0, 100)
+        ax_qtable.plot(steps0, q_coverage, color="tab:orange", label="Coverage %")
 
         # --- Q-values (worker 0 only) ---
         ax_qval.cla()

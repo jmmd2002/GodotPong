@@ -19,10 +19,10 @@ var paddleA: Node2D
 var game_manager: Node
 
 #normalization values
-@onready var viewport_size: Vector2 = get_viewport().size
-@onready var max_x: float = viewport_size.x
-@onready var max_y: float = viewport_size.y
-@onready var max_speed: float = 1600
+# Use ProjectSettings so headless mode gets the correct design resolution
+var max_x: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1280)
+var max_y: float = ProjectSettings.get_setting("display/window/size/viewport_height", 720)
+var max_speed: float = 1600
 
 func _ready() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()

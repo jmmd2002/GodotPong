@@ -66,6 +66,8 @@ def receive_handshake() -> str:
 
 def load_agent(training_mode: str) -> tuple[QLearningAgent, dict]:
     """Load Q-learning agent and raw config for the given training_mode."""
+    
+    training_mode = "coach"
     config_path = CONFIG_MAP.get(training_mode)
     if config_path is None:
         print(f"[WARNING] Unknown training_mode '{training_mode}'. Using default config.")
