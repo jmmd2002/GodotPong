@@ -384,6 +384,15 @@ def main():
     # save_lock: prevents two workers from writing the model file at the same time
     save_lock = threading.Lock()
 
+    # Install SIGINT handler before starting workers so Ctrl+C always sets
+    # shutdown_event reliably. On Linux with TkAgg, plt.pause() can swallow
+    # KeyboardInterrupt, preventing the except clause below from ever running.
+    def _sigint_handler(signum, frame):
+        print("\nShutting down all workers...")
+        signal.signal(signal.SIGINT, signal.SIG_IGN)  # ignore further Ctrl+C
+        shutdown_event.set()
+    signal.signal(signal.SIGINT, _sigint_handler)
+
     # Stats logger (worker 0 records into it; main saves CSV on exit)
     # Also holds the shared episode reward pool across all workers.
     stats_logger = QLearningStatsLogger()

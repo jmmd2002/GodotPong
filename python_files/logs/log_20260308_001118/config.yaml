@@ -1,0 +1,32 @@
+state:
+- paddle_y
+- ball_x
+- ball_y
+- ball_vx
+- ball_vy
+bins_config:
+  paddle_y: 4
+  ball_x: 8
+  ball_y: 8
+  ball_vx: 4
+  ball_vy: 4
+actions:
+- UP
+- DOWN
+- STAY
+hyperparameters:
+  alpha: 0.05
+  gamma: 0.99
+  epsilon: 0.05
+model:
+  path: models/q_table_coach.json
+  load_on_start: true
+  save_on_exit: true
+  autosave_every_n_steps: 1000
+  num_workers: 1
+logs:
+  log_every_n_steps: 100
+  log_dir: logs
+  reward_window: 20
+  plot_enabled: true
+  plot_refresh_interval: 5.0

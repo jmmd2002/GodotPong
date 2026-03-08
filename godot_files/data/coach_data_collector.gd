@@ -102,7 +102,7 @@ func send_state() -> int:
 		prev_reward = -1.0  # missed the ball
 		done = true
 	elif prev_ball_vx < 0.0 and ball.velocity.x > 0.0:
-		prev_reward = 0.1   # paddle hit the ball back toward the wall
+		prev_reward = 0.5   # paddle hit the ball back toward the wall
 
 	prev_ball_vx = ball.velocity.x
 	score_right_prev = score_right_current
