@@ -40,7 +40,8 @@ def receive_handshake() -> str:
     print(f"Waiting for handshake on port {BASE_PORT}...")
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    if hasattr(socket, 'SO_REUSEPORT'):
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     server.bind((HOST, BASE_PORT))
     server.listen(1)
     conn, addr = server.accept()
@@ -226,7 +227,8 @@ def worker(worker_id: int, agent: QLearningAgent, model_path: Path,
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    if hasattr(socket, 'SO_REUSEPORT'):
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     server.settimeout(1.0)  # allows checking shutdown_event periodically
     try:
         server.bind((HOST, port))

@@ -1,37 +1,4 @@
-# Activate virtual environment
-& "python_files\.venv\Scripts\Activate.ps1"
-
-# Read num_workers and base port from Python config
-$BASE_PORT = 5000
-$NUM_WORKERS = [int](python -c @"
-import yaml
-with open('python_files/config/QAgent_coach.yaml') as f:
-    c = yaml.safe_load(f)
-print(c.get('model', {}).get('num_workers', 1))
-"@)
-
-Write-Host "Starting $NUM_WORKERS Godot instance(s) on ports $BASE_PORT to $($BASE_PORT + $NUM_WORKERS - 1)..."
-
-# Kill any lingering processes still holding the target ports
-for ($i = 0; $i -lt $NUM_WORKERS; $i++) {
-    $PORT = $BASE_PORT + $i
-    $conn = Get-NetTCPConnection -LocalPort $PORT -ErrorAction SilentlyContinue
-    if ($conn) {
-        $conn | ForEach-Object {
-            $pid_ = $_.OwningProcess
-            Write-Host "Killing leftover process on port $PORT (PID: $pid_)"
-            Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
-# Start Python server
-$pythonProc = $null
-$pythonProc = Start-Process -FilePath "python" -ArgumentList "-u", "python_files/main.py" -PassThru -NoNewWindow
-Write-Host "Python started (PID: $($pythonProc.Id))"
-
-# Give Python a moment to bind its sockets before Godot connects
-Start-Sleep -Milliseconds 100
+p -Milliseconds 100
 
 # Resolve Godot executable (env override, PATH, local, common Windows locations)
 function Resolve-GodotExecutable {
@@ -104,13 +71,6 @@ if (-not $godotExecutable) {
 }
 
 Write-Host "Using Godot executable: $godotExecutable"
-
-# Import project if .godot cache is missing (required for headless runs)
-if (-not (Test-Path (Join-Path (Get-Location).Path "godot_files\.godot"))) {
-    Write-Host "Importing Godot project (first run)..."
-    & $godotExecutable --headless --path "godot_files/" --import
-    Write-Host "Import complete."
-}
 
 # Launch one Godot instance per worker, each on its own port
 $godotProcs = @()
