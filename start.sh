@@ -37,7 +37,7 @@ sleep 0.1
 GODOT_PIDS=()
 for i in $(seq 0 $((NUM_WORKERS - 1))); do
     PORT=$((BASE_PORT + i))
-    godot --headless --path godot_files/ -- --port $PORT &
+    godot --path godot_files/ -- --port $PORT &
     GODOT_PIDS+=("$!")
     echo "Godot instance $i started on port $PORT (PID: ${GODOT_PIDS[-1]})"
     sleep 0.1
