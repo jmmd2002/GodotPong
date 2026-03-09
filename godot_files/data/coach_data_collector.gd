@@ -21,13 +21,9 @@ var paddleA: Node2D
 var game_manager: Node
 
 #normalization values
-#@onready var viewport_size: Vector2 = get_viewport().size
-#@onready var max_x: float = viewport_size.x
-#@onready var max_y: float = viewport_size.y
-#For headless mode
-var max_x: float = 1280
-var max_y: float = 720
-@onready var max_speed: float = 1600
+var max_x: float = Global.VIEWPORT_SIZE.x
+var max_y: float = Global.VIEWPORT_SIZE.y
+var max_speed: float = Global.MAX_SPEED
 
 func _ready() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()

@@ -24,10 +24,10 @@ var paddleA: Node2D
 var paddleB: Node2D
 var game_manager: Node
 
-#normalization values (hardcoded to match project settings — safe for headless mode)
-var max_x: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1280)
-var max_y: float = ProjectSettings.get_setting("display/window/size/viewport_height", 720)
-@onready var max_speed: float = 1600
+#normalization values
+var max_x: float = Global.VIEWPORT_SIZE.x
+var max_y: float = Global.VIEWPORT_SIZE.y
+var max_speed: float = Global.MAX_SPEED
 
 func _ready() -> void:
 	# Allow port to be overridden via command-line: godot -- --port 5001

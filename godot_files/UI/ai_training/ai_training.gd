@@ -6,10 +6,7 @@ var paddle_a: Node2D
 var paddle_b: Node2D
 
 func _ready() -> void:
-	var viewport_size: Vector2 = Vector2(
-		ProjectSettings.get_setting("display/window/size/viewport_width", 1280),
-		ProjectSettings.get_setting("display/window/size/viewport_height", 720)
-	)
+	var viewport_size: Vector2 = Global.VIEWPORT_SIZE
 
 	paddle_a = $PaddleA
 	paddle_a.position = Vector2(40.0, viewport_size.y / 2)
