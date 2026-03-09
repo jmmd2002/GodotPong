@@ -7,6 +7,7 @@ extends Control
 @onready var ip_space: LineEdit = $forIP
 @onready var ai_train_button: Button = $AITraining
 var game_path: String = "res://game/game/game.tscn"
+var char_select_path: String = "res://UI/character_select/character_select.tscn"
 var ai_training_path: String = "res://UI/ai_training/ai_training_menu.tscn"
 
 
@@ -68,7 +69,7 @@ func _ready():
 	ai_train_button.pressed.connect(_on_ai_train_pressed)
 
 func _on_local_pressed():
-	get_tree().change_scene_to_file(game_path)
+	get_tree().change_scene_to_file(char_select_path)
 
 func _on_ai_train_pressed():
 	get_tree().change_scene_to_file(ai_training_path)
