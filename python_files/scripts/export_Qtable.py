@@ -13,8 +13,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from qlearning_agent import QLearningAgent
 
 # ── Configuration ────────────────────────────────────────────────────────────
-CONFIG_PATH = Path(__file__).parent.parent / "config" / "QAgent_student.yaml"
-OUTPUT_PATH = Path(__file__).parent.parent.parent / "godot_files" / "models" / "q_table_student.json"
+CONFIG_PATH = Path(__file__).parent.parent / "config" / "QAgent_coach.yaml"
+OUTPUT_PATH = Path(__file__).parent.parent.parent / "godot_files" / "models" / "q_table_coach.json"
 # ─────────────────────────────────────────────────────────────────────────────
 
 
