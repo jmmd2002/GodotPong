@@ -72,6 +72,13 @@ if (-not $godotExecutable) {
 
 Write-Host "Using Godot executable: $godotExecutable"
 
+# Import project if .godot cache is missing (required for headless runs)
+if (-not (Test-Path (Join-Path (Get-Location).Path "godot_files\.godot"))) {
+    Write-Host "Importing Godot project (first run)..."
+    & $godotExecutable --headless --path "godot_files/" --import
+    Write-Host "Import complete."
+}
+
 # Launch one Godot instance per worker, each on its own port
 $godotProcs = @()
 for ($i = 0; $i -lt $NUM_WORKERS; $i++) {
