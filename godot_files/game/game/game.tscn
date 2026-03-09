@@ -3,8 +3,6 @@
 [ext_resource type="Script" uid="uid://kyu4u75ahx4v" path="res://game/game/game.gd" id="1_gsnfh"]
 [ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="2_wmtbk"]
 [ext_resource type="PackedScene" uid="uid://cvucmw8g7xtid" path="res://UI/GUI/GUI.tscn" id="3_uoos0"]
-[ext_resource type="PackedScene" uid="uid://dn4qs7uix8nby" path="res://game/paddle/paddle_manual_a.tscn" id="4_paddleA"]
-[ext_resource type="PackedScene" uid="uid://dn4qs7uix8nb0" path="res://game/paddle/paddle_manual_b.tscn" id="5_paddleB"]
 [ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="6_c3e8q"]
 [ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/kill_zone/kill_zone.tscn" id="7_fneed"]
 
@@ -14,12 +12,6 @@ ball_scene = ExtResource("2_wmtbk")
 
 [node name="CanvasLayer" parent="." unique_id=920412319 instance=ExtResource("3_uoos0")]
 layer = -1
-
-[node name="PaddleA" parent="." unique_id=1503978725 instance=ExtResource("4_paddleA")]
-position = Vector2(279, 26)
-
-[node name="PaddleB" parent="." unique_id=131719993 instance=ExtResource("5_paddleB")]
-position = Vector2(-97, 7)
 
 [node name="Ceiling" parent="." unique_id=454358827 instance=ExtResource("6_c3e8q")]
 position = Vector2(41, -199)
