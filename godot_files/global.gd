@@ -1,5 +1,8 @@
 extends Node
 
+const MAX_SPEED: float = 1600.0
+const VIEWPORT_SIZE: Vector2 = Vector2(1280, 720)
+
 const PADDLE_SCENES: Dictionary = {
 	"coach":              "res://game/paddle/paddle_coach.tscn",
 	"student":   "res://game/paddle/paddle_student.tscn",

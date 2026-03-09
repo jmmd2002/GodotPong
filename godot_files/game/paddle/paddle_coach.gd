@@ -4,7 +4,6 @@ extends "res://game/paddle/paddle_base.gd"
 @export var q_table_path: String = "res://models/q_table_coach.json"
 
 const ACTIONS: Array   = ["UP", "DOWN", "STAY"]
-const MAX_SPEED: float = 1600.0
 
 # Populated from the JSON metadata exported by Python.
 var state_vars: Array      = []   # ordered list of variable names
@@ -65,8 +64,8 @@ func get_direction() -> int:
 		"paddle_y": (position.y           - max_y / 2.0) / (max_y / 2.0),
 		"ball_x":   mirror * (ball.position.x - max_x / 2.0) / (max_x / 2.0),
 		"ball_y":   (ball.position.y       - max_y / 2.0) / (max_y / 2.0),
-		"ball_vx":  mirror * ball.velocity.x / MAX_SPEED,
-		"ball_vy":  ball.velocity.y / MAX_SPEED,
+		"ball_vx":  mirror * ball.velocity.x / Global.MAX_SPEED,
+		"ball_vy":  ball.velocity.y / Global.MAX_SPEED,
 	}
 
 	# Discretize each variable to its bin index, in the order state_vars specifies.
