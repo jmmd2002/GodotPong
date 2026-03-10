@@ -18,8 +18,9 @@ func _ready():
 	launch_ball()
 
 func _process(delta):
-	# Joiner: position is set by host via _rpc_sync_state, no local physics
+	# Joiner: extrapolate using last received velocity; corrections arrive via _rpc_receive_ball_state
 	if Global.is_online and not multiplayer.is_server():
+		position += velocity * delta
 		return
 
 	# Sub-step: split movement so the ball never travels more than its radius in one step

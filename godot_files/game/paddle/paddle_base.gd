@@ -9,6 +9,9 @@ var velocity: Vector2 = Vector2(0.0, 0.0)
 var ai_action: String = "STAY"
 var ball: Node2D = null
 var net_id: int = 1  # peer ID of the player who owns this paddle (set by game.gd)
+var net_target_y: float = 0.0   # smoothing target for remote paddle
+var net_velocity_y: float = 0.0 # last known velocity for extrapolation between packets
+const NET_SNAP_THRESHOLD: float = 60.0  # snap if gap is too large to catch up smoothly
 
 func _initialize() -> void:
 	var size: Vector2 = Vector2(width, height)
@@ -21,11 +24,16 @@ func _initialize() -> void:
 func _ready() -> void:
 	add_to_group("paddle")
 	_initialize()
+	net_target_y = position.y
 
 func _process(delta: float) -> void:
-	# In online mode, only the owning peer runs physics for this paddle.
-	# The other peer receives position updates via RPC.
+	# Remote paddle: extrapolate target, snap if too far, otherwise move_toward smoothly
 	if Global.is_online and multiplayer.get_unique_id() != net_id:
+		net_target_y += net_velocity_y * delta
+		if abs(position.y - net_target_y) > NET_SNAP_THRESHOLD:
+			position.y = net_target_y
+		else:
+			position.y = move_toward(position.y, net_target_y, speed * delta)
 		return
 
 	var dir: int = get_direction()

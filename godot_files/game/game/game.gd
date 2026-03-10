@@ -48,34 +48,40 @@ func _update_with_host() -> void:
 	if balls.size() > 0:
 		var b: Node2D = balls[0]
 		_rpc_receive_ball_state.rpc_id(NetworkManager.joiner_id, b.position, b.velocity)
-	# Paddle A position → joiner
+	# Paddle A position + velocity → joiner
 	var pa: Node = get_node_or_null("PaddleA")
 	if pa:
-		_rpc_receive_paddle_y.rpc_id(NetworkManager.joiner_id, "a", pa.position.y)
+		_rpc_receive_paddle_state.rpc_id(NetworkManager.joiner_id, "a", pa.position.y, pa.velocity.y)
 
 
 func _update_with_joiner() -> void:
-	# Paddle B position → host
+	# Paddle B position + velocity → host
 	var pb: Node = get_node_or_null("PaddleB")
 	if pb:
-		_rpc_receive_paddle_y.rpc_id(1, "b", pb.position.y)
+		_rpc_receive_paddle_state.rpc_id(1, "b", pb.position.y, pb.velocity.y)
 
 
-# Runs on joiner: applies host-authoritative ball state to whatever ball exists
+# Runs on joiner: lerp-corrects position, snaps if error is too large (e.g. missed bounce)
+const BALL_SNAP_THRESHOLD: float = 80.0
 @rpc("authority", "unreliable")
 func _rpc_receive_ball_state(pos: Vector2, vel: Vector2) -> void:
 	var balls: Array = get_tree().get_nodes_in_group("ball")
 	if balls.size() > 0:
-		balls[0].position = pos
-		balls[0].velocity = vel
+		var b: Node2D = balls[0]
+		if b.position.distance_to(pos) > BALL_SNAP_THRESHOLD:
+			b.position = pos  # large error: snap immediately
+		else:
+			b.position = lerp(b.position, pos, 0.3)  # small drift: smooth correct
+		b.velocity = vel
 
 
-# Runs on recipient: updates the opponent's paddle Y
+# Runs on recipient: updates opponent paddle target + velocity for extrapolation
 @rpc("any_peer", "unreliable")
-func _rpc_receive_paddle_y(side: String, y: float) -> void:
+func _rpc_receive_paddle_state(side: String, y: float, vel_y: float) -> void:
 	var paddle: Node = get_node_or_null("PaddleA" if side == "a" else "PaddleB")
 	if paddle:
-		paddle.position.y = y
+		paddle.net_target_y = y
+		paddle.net_velocity_y = vel_y
 
 
 func _spawn_paddle(mode: String, node_name: String) -> Node:
