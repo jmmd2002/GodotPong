@@ -15,6 +15,7 @@ Usage:
 """
 
 import threading
+from abc import ABC, abstractmethod
 import matplotlib
 matplotlib.use("TkAgg")   # must be set before importing pyplot
 import matplotlib.pyplot as plt
@@ -22,7 +23,18 @@ import matplotlib.pyplot as plt
 from stats_logger import QLearningStatsLogger
 
 
-class QLearningLivePlotter:
+class Plotter(ABC):
+    """Abstract base class for live training plotters."""
+
+    def __init__(self, refresh_interval: float = 5.0) -> None:
+        self._refresh_interval = refresh_interval
+
+    @abstractmethod
+    def _run(self, shutdown_event: threading.Event) -> None:
+        """Blocking plot loop that runs until ``shutdown_event`` is set."""
+
+
+class QLearningLivePlotter(Plotter):
     """
     Live plot window for Q-learning training statistics.
 
@@ -33,8 +45,8 @@ class QLearningLivePlotter:
 
     def __init__(self, logger: QLearningStatsLogger, refresh_interval: float = 5.0,
                  reward_window: int = 20) -> None:
+        super().__init__(refresh_interval=refresh_interval)
         self._logger = logger
-        self._refresh_interval = refresh_interval
         self._reward_window = reward_window
         self._thread: threading.Thread | None = None
 

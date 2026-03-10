@@ -13,8 +13,10 @@ import os
 import threading
 from pathlib import Path
 
+from rl_agent import RLAgent
 
-class QLearningAgent:
+
+class QLearningAgent(RLAgent):
     """Q-Learning agent that learns to play Pong."""
 
     DEFAULT_STATE = ["paddleA_y", "paddleB_y", "ball_x", "ball_y", "ball_vx", "ball_vy"]
@@ -92,8 +94,15 @@ class QLearningAgent:
         self._total_state_action_pairs = total_states * len(self.actions)
         
         print("Q-Learning Agent initialized")
+
+    def print_config(self) -> None:
+        """Print Q-learning specific configuration and spaces."""
+        print("Algorithm: Q-Learning (tabular)")
+        print(f"Learning Rate (alpha): {self.alpha}")
+        print(f"Discount Factor (gamma): {self.gamma}")
+        print(f"Exploration Rate (epsilon): {self.epsilon}")
+        print(f"Action space: {self.actions}")
         print(f"State variables: {self.state}")
-        print(f"Available actions: {self.actions}")
         print(f"State bins configuration: {self.bins_config}")
 
     @property

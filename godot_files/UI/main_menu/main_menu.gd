@@ -72,7 +72,7 @@ func _on_local_pressed():
 	get_tree().change_scene_to_file(Paths.CHAR_SELECT)
 
 func _on_ai_train_pressed():
-	get_tree().change_scene_to_file(Paths.AI_TRAINING)
+	get_tree().change_scene_to_file(Paths.AI_TRAINING_METHODS)
 
 func _on_host_pressed():
 	Global.is_host = true

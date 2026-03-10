@@ -1,0 +1,43 @@
+# REINFORCE Policy Gradient Agent Configuration — Student
+#
+# Unlike the Q-learning agent:
+#   - No bins_config: the policy works directly on continuous normalised values
+#   - No epsilon:     exploration is implicit — the agent samples from π(a|s)
+#   - The model stores W (num_actions × state_dim) and b (num_actions,)
+#     instead of a Q-table.  For 3 actions × 6 state vars that is 21 numbers.
+
+# State variables (continuous, normalised to [-1, 1] by Godot)
+state:
+  - paddleA_y
+  - paddleB_y
+  - ball_x
+  - ball_y
+  - ball_vx
+  - ball_vy
+
+# Available actions
+actions:
+  - UP
+  - DOWN
+  - STAY
+
+# Learning hyperparameters
+hyperparameters:
+  alpha: 0.003   # Learning rate for gradient ascent — keep small; gradients are dense
+  gamma: 0.99    # Discount factor: how much future rewards matter (0 = myopic, 1 = full return)
+
+# Model persistence settings
+model:
+  path: models/policy_student.json  # Stores W and b arrays (tiny file, ~21 floats)
+  load_on_start: true
+  save_on_exit: true
+  autosave_every_n_steps: 100
+  num_workers: 2
+
+# Logging / monitoring settings
+logs:
+  log_every_n_steps: 100
+  log_dir: logs
+  reward_window: 20
+  plot_enabled: false
+  plot_refresh_interval: 5.0

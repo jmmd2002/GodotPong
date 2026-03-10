@@ -1,0 +1,37 @@
+# REINFORCE Policy Gradient Agent Configuration — Coach
+
+# State variables (continuous, normalised to [-1, 1] by Godot)
+# Coach only sees its own paddle — no opponent paddle in state
+state:
+  - paddle_y
+  - ball_x
+  - ball_y
+  - ball_vx
+  - ball_vy
+
+# Available actions
+actions:
+  - UP
+  - DOWN
+  - STAY
+
+# Learning hyperparameters
+hyperparameters:
+  alpha: 0.003   # Learning rate for gradient ascent — keep small; gradients are dense
+  gamma: 0.99    # Discount factor: how much future rewards matter (0 = myopic, 1 = full return)
+
+# Model persistence settings
+model:
+  path: models/policy_coach.json   # Stores W and b arrays (tiny file, ~18 floats)
+  load_on_start: true
+  save_on_exit: true
+  autosave_every_n_steps: 1000
+  num_workers: 100
+
+# Logging / monitoring settings
+logs:
+  log_every_n_steps: 100
+  log_dir: logs
+  reward_window: 20
+  plot_enabled: true
+  plot_refresh_interval: 5.0

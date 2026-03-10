@@ -14,13 +14,14 @@ import gzip
 import io
 import threading
 import time
+from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 
 import yaml
 
 
-class StatsLogger:
+class StatsLogger(ABC):
     """
     Base class: thread-safe in-memory buffer of training statistics.
 
@@ -60,12 +61,13 @@ class StatsLogger:
             pool = list(self._episode_rewards)
         return sum(pool) / len(pool) if pool else 0.0
 
+    @abstractmethod
     def _build_extra_row(self, stats: dict) -> dict:
-        """
-        Extract algorithm-specific fields from a stats dict.
+        """Extract algorithm-specific fields from a stats dict.
+
         Subclasses must override this to populate EXTRA_FIELDS.
         """
-        return {}
+        raise NotImplementedError
 
     def record(self, worker_id: int, step: int, total_games: int, avg_reward: float, stats: dict) -> None:
         """

@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 
-class ReinforceAgent:
+class PolicyGradientAgent:
     """REINFORCE policy gradient agent that learns to play Pong.
 
     The policy is parameterised as a linear softmax over the raw normalised
@@ -35,11 +35,8 @@ class ReinforceAgent:
     Both are updated by gradient ascent on the expected return J(θ).
     """
 
-    DEFAULT_ALPHA   = 3e-3   # learning rate — higher than Q-learning because
-                             # gradients are small for a linear policy
-    DEFAULT_GAMMA   = 0.99   # discount factor — higher than Q-learning because
-                             # REINFORCE uses full Monte Carlo returns
-
+    DEFAULT_ALPHA   = 0.1   # learning rate
+    DEFAULT_GAMMA   = 0.99   # discount factor
     def __init__(
         self,
         state_vars: list[str],
@@ -63,14 +60,16 @@ class ReinforceAgent:
         # --- configuration -----------------------------------------------
         self.state_vars = state_vars
         self.actions    = actions
-        self.state_dim  = len(state_vars)
-        self.num_actions = len(actions)
+        self.alpha      = alpha
+        self.gamma      = gamma
 
-        # --- hyperparameters (validated below) ----------------------------
-        self.alpha = alpha if isinstance(alpha, (int, float)) and 0 < alpha <= 1 \
-                     else self.DEFAULT_ALPHA
-        self.gamma = gamma if isinstance(gamma, (int, float)) and 0 <= gamma <= 1 \
-                     else self.DEFAULT_GAMMA
+        # --- validate inputs before using them ---------------------------
+        self._validate_state()
+        self._validate_actions()
+        self._validate_hyperparameters()
+
+        self.state_dim   = len(self.state_vars)
+        self.num_actions = len(self.actions)
 
         # --- policy parameters (the "brain") ------------------------------
         # W: weight matrix  shape (num_actions, state_dim)
@@ -78,7 +77,7 @@ class ReinforceAgent:
         #
         # Initialised with small random values so the softmax outputs are
         # slightly non-uniform from the start, helping early exploration.
-        rng = np.random.default_rng(seed=42)
+        rng = np.random.default_rng()
         self.W: np.ndarray = rng.normal(0.0, 0.01, (self.num_actions, self.state_dim))
         self.b: np.ndarray = np.zeros(self.num_actions)
 
@@ -128,7 +127,7 @@ class ReinforceAgent:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_dict(cls, config_dict: dict) -> 'ReinforceAgent':
+    def from_dict(cls, config_dict: dict) -> 'PolicyGradientAgent':
         """
         Create a ReinforceAgent from a YAML/dict config.
 
@@ -146,9 +145,52 @@ class ReinforceAgent:
                 alpha: 0.003
                 gamma: 0.99
         """
-        state_vars = config_dict.get('state', [])
-        actions    = config_dict.get('actions', [])
-        hp: dict   = config_dict.get('hyperparameters', {})
+        state_vars = config_dict.get('state')
+        actions    = config_dict.get('actions')
+        hp: dict   = config_dict.get('hyperparameters')
         alpha      = hp.get('alpha')
         gamma      = hp.get('gamma')
         return cls(state_vars=state_vars, actions=actions, alpha=alpha, gamma=gamma)
+
+    # ------------------------------------------------------------------
+    # Validation helpers
+    # ------------------------------------------------------------------
+
+    def _validate_state(self) -> None:
+        """
+        Validate that state_vars is a non-empty list of strings.
+        Raises ValueError if the type is wrong.
+        """
+        if not isinstance(self.state_vars, list):
+            raise ValueError("state_vars must be a list.")
+        if not self.state_vars:
+            raise ValueError("state_vars must not be empty.")
+        if not all(isinstance(v, str) for v in self.state_vars):
+            raise ValueError("All entries in state_vars must be strings.")
+
+    def _validate_actions(self) -> None:
+        """
+        Validate that actions is a non-empty list of strings.
+        Raises ValueError if the type is wrong.
+        """
+        if not isinstance(self.actions, list):
+            raise ValueError("actions must be a list.")
+        if not self.actions:
+            raise ValueError("actions must not be empty.")
+        if not all(isinstance(a, str) for a in self.actions):
+            raise ValueError("All entries in actions must be strings.")
+
+    def _validate_hyperparameters(self) -> None:
+        """
+        Validate alpha and gamma; reset to defaults with a warning if invalid.
+        Valid ranges: alpha in (0, 1], gamma in [0, 1].
+        """
+        if not isinstance(self.alpha, (int, float)) or not (0 < self.alpha <= 1):
+            print(f"Warning: alpha={self.alpha!r} is invalid. "
+                  f"Resetting to default {self.DEFAULT_ALPHA}.")
+            self.alpha = self.DEFAULT_ALPHA
+
+        if not isinstance(self.gamma, (int, float)) or not (0 <= self.gamma <= 1):
+            print(f"Warning: gamma={self.gamma!r} is invalid. "
+                  f"Resetting to default {self.DEFAULT_GAMMA}.")
+            self.gamma = self.DEFAULT_GAMMA
