@@ -9,6 +9,7 @@ extends Control
 var game_path: String = "res://game/game/game.tscn"
 var char_select_path: String = "res://UI/character_select/character_select.tscn"
 var ai_training_path: String = "res://UI/ai_training/ai_training_menu.tscn"
+var lobby_path: String = "res://UI/lobby/lobby.tscn"
 
 
 func _ready():
@@ -66,6 +67,8 @@ func _ready():
 	ai_train_button.position = Vector2(viewport_size.x - ai_train_button.size.x - margin, margin)
 
 	local_button.pressed.connect(_on_local_pressed)
+	host_button.pressed.connect(_on_host_pressed)
+	join_button.pressed.connect(_on_join_pressed)
 	ai_train_button.pressed.connect(_on_ai_train_pressed)
 
 func _on_local_pressed():
@@ -76,8 +79,22 @@ func _on_ai_train_pressed():
 
 func _on_host_pressed():
 	Global.is_host = true
-	#get_tree().change_scene_to_file("game_path")
+	NetworkManager.host()
+	var lobby = load(lobby_path).instantiate()
+	lobby.setup(true)
+	get_tree().root.add_child(lobby)
+	get_tree().current_scene.queue_free()
+	get_tree().current_scene = lobby
 
 func _on_join_pressed():
-	Global.join_ip = $forIP.text
-	#get_tree().change_scene_to_file("game_path")
+	var ip: String = ip_space.text.strip_edges()
+	if ip.is_empty():
+		ip = "127.0.0.1"
+	Global.is_host = false
+	Global.join_ip = ip
+	NetworkManager.join(ip)
+	var lobby = load(lobby_path).instantiate()
+	lobby.setup(false)
+	get_tree().root.add_child(lobby)
+	get_tree().current_scene.queue_free()
+	get_tree().current_scene = lobby

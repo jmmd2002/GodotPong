@@ -11,8 +11,8 @@ const PREVIEW_CARD_GAP: float = 40.0
 # Each entry: display name, keys for each side, and sprite path
 const CHARACTERS: Array = [
 	{"name": "Human",   "key_a": "manual_a", "key_b": "manual_b", "texture": "res://assets/sprites/spr_paddle.png"},
-	{"name": "Coach",   "key_a": "coach",    "key_b": "coach",    "texture": "res://assets/sprites/spr_paddle.png"},
-	{"name": "Student", "key_a": "student",  "key_b": "student",  "texture": "res://assets/sprites/spr_paddle.png"},
+	{"name": "Coach",   "key_a": "coach",    "key_b": "coach",    "texture": "res://assets/sprites/spr_paddle_orange.png"},
+	{"name": "Student", "key_a": "student",  "key_b": "student",  "texture": "res://assets/sprites/spr_paddle_tanned.png"},
 ]
 
 var selected_a: int = 0
