@@ -3,14 +3,14 @@ extends Node
 const MAX_SPEED: float = 1600.0
 const VIEWPORT_SIZE: Vector2 = Vector2(1280, 720)
 
-const PADDLE_SCENES: Dictionary = {
-	"coach":              "res://game/paddle/paddle_coach.tscn",
-	"student":   "res://game/paddle/paddle_student.tscn",
-	"homing":    "res://game/paddle/paddle_homing.tscn",
-	"static":    "res://game/paddle/paddle_static.tscn",
-	"off":       "res://game/paddle/paddle_static.tscn",
-	"manual_a":  "res://game/paddle/paddle_manual_a.tscn",
-	"manual_b":  "res://game/paddle/paddle_manual_b.tscn",
+var PADDLE_SCENES: Dictionary = {
+	"coach":     Paddles.PADDLE_COACH,
+	"student":   Paddles.PADDLE_STUDENT,
+	"homing":    Paddles.PADDLE_HOMING,
+	"static":    Paddles.PADDLE_STATIC,
+	"off":       Paddles.PADDLE_STATIC,
+	"manual_a":  Paddles.PADDLE_MANUAL_A,
+	"manual_b":  Paddles.PADDLE_MANUAL_B,
 }
 
 var is_host: bool = false

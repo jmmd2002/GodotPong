@@ -9,10 +9,10 @@ const PREVIEW_H: float = 180.0
 const PREVIEW_CARD_GAP: float = 40.0
 
 # Each entry: display name, keys for each side, and sprite path
-const CHARACTERS: Array = [
-	{"name": "Human",   "key_a": "manual_a", "key_b": "manual_b", "texture": "res://assets/sprites/spr_paddle.png"},
-	{"name": "Coach",   "key_a": "coach",    "key_b": "coach",    "texture": "res://assets/sprites/spr_paddle_orange.png"},
-	{"name": "Student", "key_a": "student",  "key_b": "student",  "texture": "res://assets/sprites/spr_paddle_tanned.png"},
+var CHARACTERS: Array = [
+	{"name": "Human",   "key_a": "manual_a", "key_b": "manual_b", "texture": Sprites.SPR_PADDLE},
+	{"name": "Coach",   "key_a": "coach",    "key_b": "coach",    "texture": Sprites.SPR_PADDLE_QCOACH},
+	{"name": "Student", "key_a": "student",  "key_b": "student",  "texture": Sprites.SPR_PADDLE_QSTUDENT},
 ]
 
 var selected_a: int = 0
@@ -27,7 +27,7 @@ var preview_b: TextureRect = null
 @onready var back_btn: Button = $BackButton
 @onready var play_btn: Button = $PlayButton
 
-var font: Font = preload("res://assets/fonts/joystix monospace.otf")
+var font: Font = load(Fonts.FONT_JOYSTIX)
 
 
 func _ready() -> void:
@@ -238,7 +238,7 @@ func _style_btn(btn: Button, normal: Color, hover: Color) -> void:
 func _on_back_pressed() -> void:
 	if Global.is_online:
 		NetworkManager.stop()
-	get_tree().change_scene_to_file("res://UI/main_menu/main_menu.tscn")
+	get_tree().change_scene_to_file(Paths.MAIN_MENU)
 
 
 func _on_play_pressed() -> void:
@@ -246,7 +246,7 @@ func _on_play_pressed() -> void:
 		# Host triggers start for both sides
 		_rpc_start_game.rpc()
 	else:
-		get_tree().change_scene_to_file("res://game/game/game.tscn")
+		get_tree().change_scene_to_file(Paths.GAME)
 
 
 # --- Multiplayer RPCs ---
@@ -268,7 +268,7 @@ func _rpc_sync_selection(side: String, index: int) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_start_game() -> void:
-	get_tree().change_scene_to_file("res://game/game/game.tscn")
+	get_tree().change_scene_to_file(Paths.GAME)
 
 
 func _add_side_badge(text: String, center_x: float, y: float, color: Color) -> void:

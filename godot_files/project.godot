@@ -23,6 +23,10 @@ Dispatcher="*uid://00eccg0y1xou"
 GameManager="*uid://kpskowpekiwr"
 Global="*uid://dfbhgooyhuwf4"
 NetworkManager="*uid://cyhqh5ucldoyu"
+Paths="*uid://cnmjai53mfybr"
+Fonts="*uid://ccwboot8256hl"
+Sprites="*uid://cm176osxap5ij"
+Paddles="*uid://jlxy8obylye5"
 
 [display]
 

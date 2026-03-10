@@ -7,9 +7,7 @@ extends Control
 @onready var coach_button: Button = $TrainCoachButton
 @onready var back_button: Button = $BackButton
 
-const MENU_PATH: String = "res://UI/main_menu/main_menu.tscn"
-const GAME_PATH: String = "res://UI/ai_training/ai_training.tscn"
-const COACH_TRAINING_PATH: String = "res://UI/ai_training/coach_training.tscn"
+
 
 
 func _ready() -> void:
@@ -63,14 +61,14 @@ func _on_vs_static_pressed() -> void:
 	Global.training_mode = "vs_static"
 	Global.paddle_a_mode = "ai_training_paddle"
 	Global.paddle_b_mode = "static"
-	get_tree().change_scene_to_file(GAME_PATH)
+	get_tree().change_scene_to_file(Paths.AI_TRAINING_RUN)
 
 
 func _on_vs_homing_pressed() -> void:
 	Global.training_mode = "vs_homing"
 	Global.paddle_a_mode = "ai_training_paddle"
 	Global.paddle_b_mode = "homing"
-	get_tree().change_scene_to_file(GAME_PATH)
+	get_tree().change_scene_to_file(Paths.AI_TRAINING_RUN)
 
 
 func _on_vs_coach_pressed() -> void:
@@ -78,7 +76,7 @@ func _on_vs_coach_pressed() -> void:
 	Global.training_mode = "vs_coach"
 	Global.paddle_a_mode = "ai_training_paddle"
 	Global.paddle_b_mode = "coach"
-	get_tree().change_scene_to_file(GAME_PATH)
+	get_tree().change_scene_to_file(Paths.AI_TRAINING_RUN)
 
 
 func _on_coach_pressed() -> void:
@@ -86,8 +84,8 @@ func _on_coach_pressed() -> void:
 	Global.training_mode = "coach"
 	Global.paddle_a_mode = "ai_training_paddle"
 	Global.paddle_b_mode = "off"
-	get_tree().change_scene_to_file(COACH_TRAINING_PATH)
+	get_tree().change_scene_to_file(Paths.COACH_TRAINING)
 
 
 func _on_back_pressed() -> void:
-	get_tree().change_scene_to_file(MENU_PATH)
+	get_tree().change_scene_to_file(Paths.MAIN_MENU)

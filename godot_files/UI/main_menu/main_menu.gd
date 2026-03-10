@@ -6,10 +6,7 @@ extends Control
 @onready var join_button: Button = $Join
 @onready var ip_space: LineEdit = $forIP
 @onready var ai_train_button: Button = $AITraining
-var game_path: String = "res://game/game/game.tscn"
-var char_select_path: String = "res://UI/character_select/character_select.tscn"
-var ai_training_path: String = "res://UI/ai_training/ai_training_menu.tscn"
-var lobby_path: String = "res://UI/lobby/lobby.tscn"
+
 
 
 func _ready():
@@ -72,15 +69,15 @@ func _ready():
 	ai_train_button.pressed.connect(_on_ai_train_pressed)
 
 func _on_local_pressed():
-	get_tree().change_scene_to_file(char_select_path)
+	get_tree().change_scene_to_file(Paths.CHAR_SELECT)
 
 func _on_ai_train_pressed():
-	get_tree().change_scene_to_file(ai_training_path)
+	get_tree().change_scene_to_file(Paths.AI_TRAINING)
 
 func _on_host_pressed():
 	Global.is_host = true
 	NetworkManager.host()
-	var lobby = load(lobby_path).instantiate()
+	var lobby = load(Paths.LOBBY).instantiate()
 	lobby.setup(true)
 	get_tree().root.add_child(lobby)
 	get_tree().current_scene.queue_free()
@@ -93,7 +90,7 @@ func _on_join_pressed():
 	Global.is_host = false
 	Global.join_ip = ip
 	NetworkManager.join(ip)
-	var lobby = load(lobby_path).instantiate()
+	var lobby = load(Paths.LOBBY).instantiate()
 	lobby.setup(false)
 	get_tree().root.add_child(lobby)
 	get_tree().current_scene.queue_free()

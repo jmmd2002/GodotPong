@@ -1,8 +1,7 @@
 extends Control
 
 var _is_host: bool = false
-var main_menu_path: String = "res://UI/main_menu/main_menu.tscn"
-var char_select_path: String = "res://UI/character_select/character_select.tscn"
+
 
 @onready var status_label: Label = $StatusLabel
 @onready var back_button: Button = $BackButton
@@ -67,14 +66,14 @@ func _on_dot_tick() -> void:
 func _on_player_connected() -> void:
 	$StatusLabel.text = "Connected! Loading character select..."
 	await get_tree().create_timer(1.0).timeout
-	get_tree().change_scene_to_file(char_select_path)
+	get_tree().change_scene_to_file(Paths.CHAR_SELECT)
 
 func _on_connection_failed() -> void:
 	$StatusLabel.text = "Connection failed. Returning to menu..."
 	NetworkManager.stop()
 	await get_tree().create_timer(2.0).timeout
-	get_tree().change_scene_to_file(main_menu_path)
+	get_tree().change_scene_to_file(Paths.MAIN_MENU)
 
 func _on_back_pressed() -> void:
 	NetworkManager.stop()
-	get_tree().change_scene_to_file(main_menu_path)
+	get_tree().change_scene_to_file(Paths.MAIN_MENU)
