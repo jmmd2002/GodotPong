@@ -6,6 +6,8 @@ signal player_connected
 signal connection_failed
 signal player_disconnected
 
+var joiner_id: int = 0
+
 func host() -> void:
 	var peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
 	var err: int = peer.create_server(PORT, 2)
@@ -35,11 +37,13 @@ func stop() -> void:
 	if multiplayer.multiplayer_peer:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null
+	joiner_id = 0
 	Global.is_online = false
 	Global.is_host = false
 
 func _on_peer_connected(id: int) -> void:
 	print("NetworkManager: Peer connected: ", id)
+	joiner_id = id
 	player_connected.emit()
 
 func _on_peer_disconnected(id: int) -> void:

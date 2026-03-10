@@ -10,12 +10,18 @@ var respawn_timer: float = 0
 
 func _ready():
 	add_to_group("ball")
-	
-	_reset_ball() # start in the center of the screen
-	await get_tree().create_timer(respawn_timer).timeout # start the 3-second countdown
-	launch_ball() # release ball
+	_reset_ball()  # always run: sets sprite scale, collision shape, and center position
+	# Joiner: physics and launch are driven by host via RPC
+	if Global.is_online and not multiplayer.is_server():
+		return
+	await get_tree().create_timer(respawn_timer).timeout
+	launch_ball()
 
 func _process(delta):
+	# Joiner: position is set by host via _rpc_sync_state, no local physics
+	if Global.is_online and not multiplayer.is_server():
+		return
+
 	# Sub-step: split movement so the ball never travels more than its radius in one step
 	var num_steps: int = max(1, int(ceil(velocity.length() * delta / ball_radius)))
 	var sub_delta: float = delta / num_steps
@@ -25,8 +31,8 @@ func _process(delta):
 			return  # ball was destroyed by a kill zone, stop processing
 
 	# Guard: respawn ball if it has escaped the viewport (physics edge case)
-	var _vp_w: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1280)
-	var _vp_h: float = ProjectSettings.get_setting("display/window/size/viewport_height", 720)
+	var _vp_w: float = Global.VIEWPORT_SIZE.x
+	var _vp_h: float = Global.VIEWPORT_SIZE.y
 	var vp: Rect2 = Rect2(0.0, 0.0, _vp_w, _vp_h)
 	if position.x < vp.position.x or position.x > vp.end.x or \
 	   position.y < vp.position.y or position.y > vp.end.y:
@@ -44,10 +50,7 @@ func _reset_ball():
 	# Set size and collision mask
 	$Sprite2D.scale = ball_size / $Sprite2D.texture.get_size()
 	$CollisionShape2D.shape = ball_mask
-	var _vp_size: Vector2 = Vector2(
-		ProjectSettings.get_setting("display/window/size/viewport_width", 1280),
-		ProjectSettings.get_setting("display/window/size/viewport_height", 720)
-	)
+	var _vp_size: Vector2 = Global.VIEWPORT_SIZE
 	global_position = _vp_size / 2
 	velocity = Vector2.ZERO
 	

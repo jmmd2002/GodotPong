@@ -8,6 +8,7 @@ extends Node2D
 var velocity: Vector2 = Vector2(0.0, 0.0)
 var ai_action: String = "STAY"
 var ball: Node2D = null
+var net_id: int = 1  # peer ID of the player who owns this paddle (set by game.gd)
 
 func _initialize() -> void:
 	var size: Vector2 = Vector2(width, height)
@@ -21,12 +22,18 @@ func _ready() -> void:
 	add_to_group("paddle")
 	_initialize()
 
-func _physics_process(delta: float) -> void:
+func _process(delta: float) -> void:
+	# In online mode, only the owning peer runs physics for this paddle.
+	# The other peer receives position updates via RPC.
+	if Global.is_online and multiplayer.get_unique_id() != net_id:
+		return
+
 	var dir: int = get_direction()
 	velocity.y = dir * speed
 
 	handle_collisions()
 	position += velocity * delta
+
 
 # Override this in mode-specific subclasses.
 # Base behaviour is static (returns 0).
