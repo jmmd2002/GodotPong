@@ -14,10 +14,9 @@ const PADDLE_SCENES: Dictionary = {
 }
 
 var is_host: bool = false
+var is_online: bool = false
 var join_ip: String = ""
-# "manual" | "homing" (PaddleA is always ai_training_paddle in AI training scenes)
-var paddle_a_mode: String = "manual"
-# "manual" | "static" | "homing" | "coach" | "student"
-var paddle_b_mode: String = "manual"
+var paddle_a_mode: String = "manual_a"
+var paddle_b_mode: String = "manual_b"
 # "vs_static" | "vs_homing" | "vs_coach" | "coach"
 var training_mode: String = "vs_static"

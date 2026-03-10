@@ -2,7 +2,7 @@ extends Control
 
 var _is_host: bool = false
 var main_menu_path: String = "res://UI/main_menu/main_menu.tscn"
-var game_path: String = "res://game/game/game.tscn"
+var char_select_path: String = "res://UI/character_select/character_select.tscn"
 
 @onready var status_label: Label = $StatusLabel
 @onready var back_button: Button = $BackButton
@@ -65,9 +65,9 @@ func _on_dot_tick() -> void:
 	$StatusLabel.text = _base_text + ".".repeat(_dot_count)
 
 func _on_player_connected() -> void:
-	$StatusLabel.text = "Connected! Starting game..."
-	await get_tree().create_timer(2.0).timeout
-	get_tree().change_scene_to_file(game_path)
+	$StatusLabel.text = "Connected! Loading character select..."
+	await get_tree().create_timer(1.0).timeout
+	get_tree().change_scene_to_file(char_select_path)
 
 func _on_connection_failed() -> void:
 	$StatusLabel.text = "Connection failed. Returning to menu..."

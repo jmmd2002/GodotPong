@@ -87,6 +87,24 @@ func _ready() -> void:
 	play_btn.position = Vector2(vp.x / 2.0 - 70.0, vp.y - 110.0)
 	play_btn.pressed.connect(_on_play_pressed)
 
+	# Multiplayer: label each column and restrict the joiner's Play button
+	if Global.is_online:
+		var your_x: float = center_a if Global.is_host else center_b
+		var their_x: float = center_b if Global.is_host else center_a
+		_add_side_badge("YOU", your_x, vp.y - 160.0, Color(0.2, 0.8, 0.3))
+		_add_side_badge("OPPONENT", their_x, vp.y - 160.0, Color(0.7, 0.7, 0.7))
+		if not Global.is_host:
+			play_btn.visible = false
+			var wait_lbl := Label.new()
+			wait_lbl.text = "Waiting for host to start..."
+			wait_lbl.add_theme_font_override("font", font)
+			wait_lbl.add_theme_font_size_override("font_size", 16)
+			wait_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+			wait_lbl.position = Vector2(vp.x / 2.0 - 160.0, vp.y - 100.0)
+			wait_lbl.size = Vector2(320.0, 36.0)
+			wait_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			add_child(wait_lbl)
+
 
 func _make_card(data: Dictionary, pos: Vector2, index: int, side: String) -> Panel:
 	var panel := Panel.new()
@@ -126,6 +144,12 @@ func _make_card(data: Dictionary, pos: Vector2, index: int, side: String) -> Pan
 
 func _on_card_input(event: InputEvent, index: int, side: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		# In multiplayer each player can only pick their own side
+		if Global.is_online:
+			if Global.is_host and side != "a":
+				return
+			if not Global.is_host and side != "b":
+				return
 		if side == "a":
 			selected_a = index
 			Global.paddle_a_mode = CHARACTERS[index]["key_a"]
@@ -137,6 +161,8 @@ func _on_card_input(event: InputEvent, index: int, side: String) -> void:
 			name_label_b.text = CHARACTERS[index]["name"]
 			preview_b.texture = load(CHARACTERS[index]["texture"])
 		_refresh_highlights()
+		if Global.is_online:
+			_rpc_sync_selection.rpc(side, index)
 
 
 func _on_card_hover(panel: Panel, index: int, side: String) -> void:
@@ -210,8 +236,49 @@ func _style_btn(btn: Button, normal: Color, hover: Color) -> void:
 
 
 func _on_back_pressed() -> void:
+	if Global.is_online:
+		NetworkManager.stop()
 	get_tree().change_scene_to_file("res://UI/main_menu/main_menu.tscn")
 
 
 func _on_play_pressed() -> void:
+	if Global.is_online:
+		# Host triggers start for both sides
+		_rpc_start_game.rpc()
+	else:
+		get_tree().change_scene_to_file("res://game/game/game.tscn")
+
+
+# --- Multiplayer RPCs ---
+
+@rpc("any_peer", "reliable")
+func _rpc_sync_selection(side: String, index: int) -> void:
+	if side == "a":
+		selected_a = index
+		Global.paddle_a_mode = CHARACTERS[index]["key_a"]
+		name_label_a.text = CHARACTERS[index]["name"]
+		preview_a.texture = load(CHARACTERS[index]["texture"])
+	else:
+		selected_b = index
+		Global.paddle_b_mode = CHARACTERS[index]["key_b"]
+		name_label_b.text = CHARACTERS[index]["name"]
+		preview_b.texture = load(CHARACTERS[index]["texture"])
+	_refresh_highlights()
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_start_game() -> void:
 	get_tree().change_scene_to_file("res://game/game/game.tscn")
+
+
+func _add_side_badge(text: String, center_x: float, y: float, color: Color) -> void:
+	var lbl: Label = Label.new()
+	lbl.text = text
+	lbl.add_theme_font_override("font", font)
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.size = Vector2(100.0, 24.0)
+	lbl.position = Vector2(center_x - 50.0, y)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(lbl)

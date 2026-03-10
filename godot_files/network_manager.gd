@@ -15,6 +15,7 @@ func host() -> void:
 	multiplayer.multiplayer_peer = peer
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+	Global.is_online = true
 	print("NetworkManager: Hosting on port ", PORT)
 
 func join(ip: String) -> void:
@@ -27,12 +28,15 @@ func join(ip: String) -> void:
 	multiplayer.multiplayer_peer = peer
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
+	Global.is_online = true
 	print("NetworkManager: Connecting to ", ip, ":", PORT)
 
 func stop() -> void:
 	if multiplayer.multiplayer_peer:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null
+	Global.is_online = false
+	Global.is_host = false
 
 func _on_peer_connected(id: int) -> void:
 	print("NetworkManager: Peer connected: ", id)
