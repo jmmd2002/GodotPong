@@ -11,7 +11,6 @@ _build_extra_row() to extract the method-specific data from its stats dict.
 
 import csv
 import gzip
-import io
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -38,6 +37,7 @@ class StatsLogger(ABC):
     ]
 
     EXTRA_FIELDS: list[str] = []  # Overridden by subclasses
+    AGENT_NAME:   str       = "agent"  # Overridden by subclasses — used in log folder name
 
     @property
     def FIELDS(self) -> list[str]:
@@ -114,7 +114,7 @@ class StatsLogger(ABC):
             return
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_dir = Path(base_dir) / f"log_{timestamp}"
+        log_dir = Path(base_dir) / f"log_{self.AGENT_NAME}_{timestamp}"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Write gzip-compressed CSV
@@ -132,6 +132,71 @@ class StatsLogger(ABC):
         print(f"Training log saved to {log_dir} ({len(snapshot)} records)")
 
 
+class PolicyGradientStatsLogger(StatsLogger):
+    """
+    StatsLogger for the REINFORCE policy gradient agent.
+
+    Extra columns logged per record:
+        - pg_episodes:   Total episodes that triggered a gradient update
+        - pg_loss:       Policy loss from the most recent episode
+        - avg_w:         Mean absolute weight value of W
+        - max_w:         Max absolute weight value of W
+        - std_w:         Std of W weights
+        - avg_entropy:   Mean action entropy at the zero state (proxy for
+                         policy confidence; drops as policy sharpens)
+        - b_0 .. b_N:    Individual bias value per action. Reveals which action
+                         the policy favours in a neutral state independently of W.
+        - updates:       Total timesteps processed
+    """
+
+    AGENT_NAME   = "PolicyGradient"
+
+    EXTRA_FIELDS = [
+        "pg_episodes",      # total episodes that triggered a gradient update
+        "pg_loss",          # last policy loss
+        "episode_return",   # return of the last finished episode
+        "episode_length",   # length (timesteps) of the last finished episode
+        "avg_w",            # mean |W|
+        "max_w",            # max |W|
+        "std_w",            # std of W
+        "avg_entropy",      # policy entropy at zero state
+        "grad_norm_W",      # L2 norm of last dW
+        "grad_norm_b",      # L2 norm of last db
+        "b_0",              # per-action bias terms (3 actions)
+        "b_1",
+        "b_2",
+        "updates",          # total timesteps processed
+    ]
+
+    def _build_extra_row(self, stats: dict) -> dict:
+        # Return empty strings for all extra fields when no stats dict is
+        # provided (e.g. non-primary workers). This keeps CSV columns blank
+        # rather than filled with misleading zeros.
+        if not stats:
+            return {field: "" for field in self.EXTRA_FIELDS}
+
+        row = {
+            "pg_episodes":    stats.get("episodes", 0),
+            "pg_loss":        round(stats.get("last_loss", 0.0), 6),
+            "episode_return": round(stats.get("episode_return", 0.0), 6),
+            "episode_length": stats.get("episode_length", 0),
+            "avg_w":          round(stats.get("avg_w", 0.0), 6),
+            "max_w":          round(stats.get("max_w", 0.0), 6),
+            "std_w":          round(stats.get("std_w", 0.0), 6),
+            "avg_entropy":    round(stats.get("avg_entropy", 0.0), 6),
+            "grad_norm_W":    round(stats.get("grad_norm_W", 0.0), 6),
+            "grad_norm_b":    round(stats.get("grad_norm_b", 0.0), 6),
+            "updates":        stats.get("updates", 0),
+        }
+
+        # Individual bias values — for now this logger assumes three actions
+        # and therefore three bias terms b_0, b_1, b_2.
+        for i in range(3):
+            row[f"b_{i}"] = round(stats.get(f"b_{i}", 0.0), 6)
+
+        return row
+
+
 class QLearningStatsLogger(StatsLogger):
     """
     StatsLogger for Q-learning (value iteration).
@@ -145,6 +210,8 @@ class QLearningStatsLogger(StatsLogger):
         - exploration_rate: Percentage of actions that were random explorations
         - updates:          Total Q-value updates applied
     """
+
+    AGENT_NAME   = "QLearning"
 
     EXTRA_FIELDS = [
         "q_states",

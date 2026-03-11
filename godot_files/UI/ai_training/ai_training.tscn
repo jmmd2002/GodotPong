@@ -1,43 +1,43 @@
 [gd_scene format=3 uid="uid://bm3kpq7dst4nh"]
 
-[ext_resource type="Script" uid="uid://cx9n2pq4vt7ab" path="res://UI/ai_training/ai_training.gd" id="1_gsnfh"]
+[ext_resource type="Script" uid="uid://cyan2pq4vt7ab" path="res://UI/ai_training/ai_training.gd" id="1_gsnfh"]
 [ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="2_wmtbk"]
 [ext_resource type="PackedScene" uid="uid://cvucmw8g7xtid" path="res://UI/GUI/GUI.tscn" id="3_uoos0"]
 [ext_resource type="PackedScene" uid="uid://dn4qs7ircfeqp" path="res://game/paddle/paddle_ai.tscn" id="4_paddleA"]
-[ext_resource type="PackedScene" path="res://game/paddle/paddle_base.tscn" id="5_paddleB"]
+[ext_resource type="PackedScene" uid="uid://dn4qs7ji3seqn" path="res://game/paddle/paddle_base.tscn" id="5_paddleB"]
 [ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="6_c3e8q"]
 [ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/kill_zone/kill_zone.tscn" id="7_fneed"]
 [ext_resource type="PackedScene" uid="uid://bklohefig8pcl" path="res://data/data_collector.tscn" id="8_wmtbk"]
 
-[node name="Game" type="Node2D"]
+[node name="Game" type="Node2D" unique_id=1090740396]
 script = ExtResource("1_gsnfh")
 ball_scene = ExtResource("2_wmtbk")
 
-[node name="CanvasLayer" parent="." instance=ExtResource("3_uoos0")]
+[node name="CanvasLayer" parent="." unique_id=1453524594 instance=ExtResource("3_uoos0")]
 layer = -1
 
-[node name="PaddleA" parent="." instance=ExtResource("4_paddleA")]
+[node name="PaddleA" parent="." unique_id=1465806866 instance=ExtResource("4_paddleA")]
 position = Vector2(279, 26)
 
-[node name="PaddleB" parent="." instance=ExtResource("5_paddleB")]
+[node name="PaddleB" parent="." unique_id=229452433 instance=ExtResource("5_paddleB")]
 position = Vector2(-97, 7)
 
-[node name="Ceiling" parent="." instance=ExtResource("6_c3e8q")]
+[node name="Ceiling" parent="." unique_id=2050170490 instance=ExtResource("6_c3e8q")]
 position = Vector2(41, -199)
 
-[node name="Floor" parent="." instance=ExtResource("6_c3e8q")]
+[node name="Floor" parent="." unique_id=839274296 instance=ExtResource("6_c3e8q")]
 position = Vector2(36, 122)
 
-[node name="Ball" parent="." instance=ExtResource("2_wmtbk")]
+[node name="Ball" parent="." unique_id=681390698 instance=ExtResource("2_wmtbk")]
 position = Vector2(87, 15)
 
-[node name="KillZoneA" parent="." instance=ExtResource("7_fneed")]
+[node name="KillZoneA" parent="." unique_id=127509866 instance=ExtResource("7_fneed")]
 position = Vector2(-99, 22)
 side = "left"
 
-[node name="KillZoneB" parent="." instance=ExtResource("7_fneed")]
+[node name="KillZoneB" parent="." unique_id=1991411811 instance=ExtResource("7_fneed")]
 position = Vector2(-99, 22)
 side = "right"
 
-[node name="DataCollector" parent="." instance=ExtResource("8_wmtbk")]
+[node name="DataCollector" parent="." unique_id=1277081405 instance=ExtResource("8_wmtbk")]
 position = Vector2(-188, 145)

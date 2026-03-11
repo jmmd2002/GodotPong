@@ -38,9 +38,9 @@ class RLAgent(ABC):
         """Return the action to take given the current state."""
 
     @abstractmethod
-    def update(self, state: Dict[str, float], reward: float, done: bool) -> None:
+    def update(state: dict[str, float],  reward: float, done: bool) -> None:
         """Update the agent using the previous transition's feedback."""
-
+    
     @abstractmethod
     def save(self, filepath: str) -> None:
         """Persist the agent's learned parameters to ``filepath``."""

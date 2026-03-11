@@ -9,8 +9,8 @@ from pathlib import Path
 from rl_agent import RLAgent
 from qlearning_agent import QLearningAgent
 from policy_gradient_agent import PolicyGradientAgent
-from stats_logger import StatsLogger, QLearningStatsLogger
-from live_plotter import Plotter, QLearningLivePlotter
+from stats_logger import StatsLogger, QLearningStatsLogger, PolicyGradientStatsLogger
+from live_plotter import Plotter, QLearningLivePlotter, PolicyGradientLivePlotter
 
 
 # Maps training_mode (from Godot handshake) to the config file to load
@@ -37,11 +37,11 @@ AGENTS_MAP: dict[str, type] = {
 }
 LOGGERS_MAP: dict[str, type] = {
     "qvalue": QLearningStatsLogger,
-    # "policy_gradient": PolicyGradientStatsLogger,  # TODO
+    "policy_gradient": PolicyGradientStatsLogger,
 }
 PLOTTERS_MAP: dict[str, type] = {
     "qvalue": QLearningLivePlotter,
-    # "policy_gradient": PolicyGradientLivePlotter,  # TODO
+    "policy_gradient": PolicyGradientLivePlotter,
 }
 
 HOST = "127.0.0.1"
@@ -50,9 +50,9 @@ NUM_WORKERS = 1        # Set to e.g. 3 to run 3 Godot instances in parallel
 HEARTBEAT_TIMEOUT = 60.0  # seconds; warn if no message received from a worker
 
 
-def receive_handshake() -> str:
+def receive_handshake() -> tuple[str, str]:
     """Listen on BASE_PORT for the first Godot connection, read the handshake JSON,
-    then close. Returns the training_mode string. Workers will re-accept on the same port."""
+    then close. Returns the training_method and training_mode strings. Workers will re-accept on the same port."""
     print(f"Waiting for handshake on port {BASE_PORT}...")
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -73,19 +73,30 @@ def receive_handshake() -> str:
                 line, _ = buffer.split("\n", 1)
                 msg: dict = json.loads(line.strip())
                 if msg.get("type") == "handshake":
-                    training_mode = msg.get("training_mode", "vs_static")
-                    print(f"Handshake received: training_mode='{training_mode}'")
-                    return training_mode
+                    training_method = msg.get("training_method")
+                    training_mode = msg.get("training_mode")
+                    print(f"Handshake received: training_mode='{training_mode}', training_method='{training_method}'")
+                    validate_handshake(training_method, training_mode)
+                    return training_method, training_mode
                 raise ValueError(f"Expected handshake, got: {msg}")
     finally:
         conn.close()
         server.close()
 
+def validate_handshake(training_method: str, training_mode: str) -> None:
+    """Validate the handshake message from Godot. Raises ValueError if invalid."""
+    if training_method is None or training_mode is None:
+        raise TypeError("Handshake corrupted. Could not find training mode or training method")
+    if training_method not in METHODS_MAP:
+        raise ValueError(f"Unknown training_method '{training_method}' in handshake.")
+    if training_mode not in METHODS_MAP[training_method]:
+        raise ValueError(f"Unknown training_mode '{training_mode}' for method '{training_method}' in handshake.")
 
 def load_agent(training_method: str, training_mode: str) -> tuple[RLAgent, dict]:
     """Load Q-learning agent and raw config for the given training_mode."""
     
-    training_mode = "coach" #for headless training
+    #training_method = "qvalue"  #for headless training
+    #training_mode = "coach" #for headless training
     config_path = METHODS_MAP.get(training_method).get(training_mode)
     if config_path is None:
         raise ValueError(f"Unknown training_mode '{training_mode}' for method '{training_method}'.")
@@ -327,8 +338,8 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
                             stats_logger.add_episode_reward(current_episode_reward, reward_window)
                         current_episode_reward = 0.0
 
-                    # Autosave: only worker 0 saves — all workers share the same Q-table
-                    # so saving once is enough; no need for every worker to write the file
+                    # Autosave: only worker 0 saves — all workers share the same agent,
+                    # so saving once is enough; no need for every worker to write the file.
                     if worker_id == 0 and autosave_every_n_steps > 0 and learning_steps % autosave_every_n_steps == 0:
                         with save_lock:
                             try:
@@ -337,8 +348,13 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
                             except Exception as e:
                                 print(f"[W{worker_id}] Autosave failed: {e}")
 
-                    # Stats logging: only worker 0 logs, using the shared reward pool
-                    # so avg_reward reflects all workers' episodes, not just one worker's window
+                    # Stats logging: only worker 0 logs agent stats.
+                    #
+                    # All workers already contribute to the shared episode reward pool
+                    # via add_episode_reward(), so avg_reward already reflects all workers.
+                    # Agent internals (W/b for PG, Q-table for QL) are shared and produce
+                    # identical get_stats() snapshots across workers — having multiple
+                    # workers log them would only create redundant rows with the same data.
                     if (worker_id == 0
                             and stats_logger is not None
                             and log_every_n_steps > 0
@@ -366,8 +382,8 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
 
 def main():
     """Start all workers and wait for Ctrl+C."""
-    training_mode = receive_handshake()
-    agent, config = load_agent(training_mode)
+    training_method, training_mode = receive_handshake()
+    agent, config = load_agent(training_method, training_mode)
 
     model_config: dict = validate_model_config(config.get("model"))
     model_path: Path = Path(__file__).parent / model_config.get("path")
@@ -408,9 +424,10 @@ def main():
         shutdown_event.set()
     signal.signal(signal.SIGINT, _sigint_handler)
 
-    # Stats logger (worker 0 records into it; main saves CSV on exit)
+    # Stats logger (worker 0 records into it; main saves CSV on exit).
     # Also holds the shared episode reward pool across all workers.
-    stats_logger: StatsLogger = LOGGERS_MAP.get(training_mode).from_dict(config) if plot_enabled else None
+    logger_cls = LOGGERS_MAP[training_method]
+    stats_logger: StatsLogger = logger_cls() if plot_enabled else None
 
     # Start all workers FIRST so every port is bound before matplotlib
     # touches the Tk event loop (plt.pause on a background thread blocks on Linux).
@@ -440,7 +457,8 @@ def main():
     # main thread on Linux; running it as a daemon thread caused plt.pause()
     # to stall the process and delay worker socket binding.
     # If plotting is disabled, the main thread simply waits for shutdown_event.
-    plotter: Plotter = PLOTTERS_MAP.get(training_mode)(stats_logger, refresh_interval=plot_refresh_interval, reward_window=reward_window) if plot_enabled else None
+    plotter_cls = PLOTTERS_MAP[training_method]
+    plotter: Plotter = plotter_cls(stats_logger, refresh_interval=plot_refresh_interval, reward_window=reward_window) if plot_enabled else None
     try:
         if plot_enabled:
             plotter._run(shutdown_event)   # blocks until shutdown_event is set

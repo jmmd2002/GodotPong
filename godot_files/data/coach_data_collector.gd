@@ -66,7 +66,8 @@ func try_connect():
 			incoming_buffer = ""
 			next_frame_id = 0
 			score_right_prev = game_manager.score_right
-			var handshake: String = JSON.stringify({"type": "handshake", "training_mode": Global.training_mode}) + "\n"
+			var handshake: String = JSON.stringify({"type": "handshake", "training_method": Global.training_method,
+													"training_mode": Global.training_mode}) + "\n"
 			client.put_data(handshake.to_utf8_buffer())
 			print("CoachCollector: Connected to Python server!")
 		else:
