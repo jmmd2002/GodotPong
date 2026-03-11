@@ -26,12 +26,12 @@ model:
   load_on_start: true
   save_on_exit: true
   autosave_every_n_steps: 1000
-  num_workers: 1
+  num_workers: 100
 
 # Logging / monitoring settings
 logs:
   log_every_n_steps: 100
   log_dir: logs
-  reward_window: 20
+  reward_window: 20 #episodes
   plot_enabled: true
-  plot_refresh_interval: 5.0
+  plot_refresh_interval: 5.0 #seconds

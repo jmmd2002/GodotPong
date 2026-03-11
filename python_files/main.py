@@ -95,8 +95,8 @@ def validate_handshake(training_method: str, training_mode: str) -> None:
 def load_agent(training_method: str, training_mode: str) -> tuple[RLAgent, dict]:
     """Load Q-learning agent and raw config for the given training_mode."""
     
-    #training_method = "qvalue"  #for headless training
-    #training_mode = "coach" #for headless training
+    training_method = "policy_gradient"  #for headless training
+    training_mode = "coach" #for headless training
     config_path = METHODS_MAP.get(training_method).get(training_mode)
     if config_path is None:
         raise ValueError(f"Unknown training_mode '{training_mode}' for method '{training_method}'.")
