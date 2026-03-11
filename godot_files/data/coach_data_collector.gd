@@ -16,6 +16,10 @@ var heartbeat_timer: float = 0.0
 var score_right_prev: int = 0
 var prev_ball_vx: float = 0.0
 
+# episode length limit
+const MAX_HITS_PER_EPISODE: int = 50
+var episode_hit_count: int = 0
+
 var ball: Node2D
 var paddleA: Node2D
 var game_manager: Node
@@ -100,6 +104,12 @@ func send_state() -> int:
 		done = true
 	elif prev_ball_vx < 0.0 and ball.velocity.x > 0.0:
 		prev_reward = 0.5   # paddle hit the ball back toward the wall
+		episode_hit_count += 1
+		if episode_hit_count >= MAX_HITS_PER_EPISODE:
+			done = true
+
+	if done:
+		episode_hit_count = 0
 
 	prev_ball_vx = ball.velocity.x
 	score_right_prev = score_right_current

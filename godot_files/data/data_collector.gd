@@ -18,6 +18,9 @@ var score_left_prev: int = 0
 var score_right_prev: int = 0
 var prev_ball_vx: float = 0.0
 
+# episode length limit
+const MAX_SCORE: int = 10
+
 #get game objects
 var ball: Node2D
 var paddleA: Node2D
@@ -104,10 +107,12 @@ func send_state() -> int:
 
 	if score_left_current > score_left_prev:
 		prev_reward = 1.0
-		done = true
+		if score_left_current >= MAX_SCORE or score_right_current >= MAX_SCORE:
+			done = true
 	elif score_right_current > score_right_prev:
 		prev_reward = -1.0
-		done = true
+		if score_left_current >= MAX_SCORE or score_right_current >= MAX_SCORE:
+			done = true
 	elif prev_ball_vx < 0.0 and ball.velocity.x > 0.0:
 		prev_reward = 0.1  # PaddleA hit the ball
 

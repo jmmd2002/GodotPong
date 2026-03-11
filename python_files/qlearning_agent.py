@@ -11,6 +11,7 @@ import math
 import tempfile
 import os
 import threading
+import itertools
 from pathlib import Path
 
 from rl_agent import RLAgent
@@ -71,7 +72,13 @@ class QLearningAgent(RLAgent):
         
         # Initialize Q-table: stores Q-values for (state, action) pairs
         # Q(s, a) = estimated value of taking action a in state s
-        self.q_table = {}
+        # Pre-allocate all (state, action) pairs to 0.0 so the full matrix exists from the start
+        bin_ranges = [range(self.bins_config[var]) for var in self.state]
+        self.q_table = {
+            (state_tuple, action): 0.0
+            for state_tuple in itertools.product(*bin_ranges)
+            for action in self.actions
+        }
         
         # Lock to protect Q-table from concurrent reads/writes across threads
         self._lock = threading.Lock()
@@ -504,8 +511,8 @@ class QLearningAgent(RLAgent):
         with open(filepath, 'r') as f:
             q_table_str_keys = json.load(f)
         
-        # Convert string keys back to tuples
-        self.q_table = {}
+        # Merge loaded values into the pre-initialized Q-table
+        # (keeps all entries; only overwrites keys present in the file)
         for str_key, q_value in q_table_str_keys.items():
             parsed_key = ast.literal_eval(str_key)
             self.q_table[parsed_key] = q_value
@@ -547,6 +554,7 @@ class QLearningAgent(RLAgent):
             avg_q = sum(q_values) / len(q_values)
             variance = sum((v - avg_q) ** 2 for v in q_values) / len(q_values)
             unique_states = len(set(s for s, _a in q_snapshot))
+            updated_entries = sum(1 for v in q_values if v != 0.0)
             stats = {
                 "num_entries": len(q_snapshot),
                 "num_states": unique_states,
@@ -554,7 +562,7 @@ class QLearningAgent(RLAgent):
                 "max_q": max(q_values),
                 "min_q": min(q_values),
                 "std_q": math.sqrt(variance),
-                "q_coverage": len(q_snapshot) / self._total_state_action_pairs * 100,
+                "q_coverage": updated_entries / self._total_state_action_pairs * 100,
             }
         
         # Add learning progress stats
