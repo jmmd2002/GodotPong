@@ -4,9 +4,9 @@
 [ext_resource type="PackedScene" uid="uid://duc7fboo8raui" path="res://game/ball/ball.tscn" id="2_ct002"]
 [ext_resource type="PackedScene" uid="uid://dn4qs7ircfeqp" path="res://game/paddle/paddle_ai.tscn" id="3_ct003"]
 [ext_resource type="PackedScene" uid="uid://dkx784wjkt6ne" path="res://game/wall/wall.tscn" id="4_ct004"]
-[ext_resource type="PackedScene" path="res://game/wall/side_wall.tscn" id="5_ct005"]
+[ext_resource type="PackedScene" uid="uid://bwvs5h3jnt8yd" path="res://game/wall/side_wall.tscn" id="5_ct005"]
 [ext_resource type="PackedScene" uid="uid://wflxblx6e3dv" path="res://game/kill_zone/kill_zone.tscn" id="6_ct006"]
-[ext_resource type="PackedScene" path="res://data/coach_data_collector.tscn" id="7_ct007"]
+[ext_resource type="PackedScene" uid="uid://cqr7bwad3nf1x" path="res://data/coach_data_collector.tscn" id="7_ct007"]
 
 [node name="CoachTraining" type="Node2D" unique_id=222222001]
 script = ExtResource("1_ct001")
