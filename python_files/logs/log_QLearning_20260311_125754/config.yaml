@@ -1,0 +1,25 @@
+state:
+- paddle_y
+- ball_x
+- ball_y
+- ball_vx
+- ball_vy
+actions:
+- UP
+- DOWN
+- STAY
+hyperparameters:
+  alpha: 0.003
+  gamma: 0.99
+model:
+  path: models/policy_coach.json
+  load_on_start: true
+  save_on_exit: true
+  autosave_every_n_steps: 1000
+  num_workers: 1
+logs:
+  log_every_n_steps: 100
+  log_dir: logs
+  reward_window: 20
+  plot_enabled: true
+  plot_refresh_interval: 5.0

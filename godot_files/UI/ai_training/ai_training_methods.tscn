@@ -1,14 +1,14 @@
-[gd_scene format=3 uid="uid://a8q6k2u9ai_methods"]
+[gd_scene format=3 uid="uid://dn3m1konis2x"]
 
-[ext_resource type="Script" path="res://UI/ai_training/ai_training_methods.gd" id="1_methods"]
+[ext_resource type="Script" uid="uid://c5jh8m0kwaqo4" path="res://UI/ai_training/ai_training_methods.gd" id="1_methods"]
 [ext_resource type="FontFile" uid="uid://dnvrai1uy21tu" path="res://assets/fonts/joystix monospace.otf" id="2_font"]
 
-[node name="AITrainingMethods" type="Control"]
+[node name="AITrainingMethods" type="Control" unique_id=332266394]
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_methods")
 
-[node name="Title" type="Label" parent="."]
+[node name="Title" type="Label" parent="." unique_id=357082227]
 layout_direction = 1
 layout_mode = 1
 anchors_preset = 8
@@ -27,21 +27,21 @@ theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="QLearningButton" type="Button" parent="."]
+[node name="QLearningButton" type="Button" parent="." unique_id=1567075451]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 20.0
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 18
 
-[node name="PolicyIterationButton" type="Button" parent="."]
+[node name="PolicyIterationButton" type="Button" parent="." unique_id=261486755]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 20.0
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 18
 
-[node name="BackButton" type="Button" parent="."]
+[node name="BackButton" type="Button" parent="." unique_id=1531458772]
 layout_mode = 0
 offset_right = 60.0
 offset_bottom = 20.0
