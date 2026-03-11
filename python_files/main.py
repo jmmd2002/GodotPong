@@ -381,7 +381,7 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
 def main():
     """Start all workers and wait for Ctrl+C."""
     training_method, training_mode = receive_handshake()
-    training_method = "policy_gradient"  #for headless training
+    training_method = "qvalue"  #for headless training
     training_mode = "coach" #for headless training
     agent, config = load_agent(training_method, training_mode)
 
