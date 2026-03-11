@@ -39,8 +39,8 @@ func _process(delta: float) -> void:
 	var dir: int = get_direction()
 	velocity.y = dir * speed
 
-	handle_collisions()
 	position += velocity * delta
+	handle_collisions()
 
 
 # Override this in mode-specific subclasses.
@@ -58,11 +58,13 @@ func handle_collisions() -> void:
 	if wall:
 		var paddle_rect: Rect2 = Utils.get_global_rect($CollisionShape2D)
 		var wall_rect: Rect2 = Utils.get_global_rect(wall.get_node("CollisionShape2D"))
-		if wall.position.y > position.y and velocity.y > 0:
+		# Use rect edges (not wall node origin) so correction fires even when
+		# the paddle overshoots past the wall's node position on a slow frame.
+		if paddle_rect.end.y > wall_rect.position.y and velocity.y > 0:
 			velocity.y = 0
 			position.y -= paddle_rect.end.y - wall_rect.position.y
 			return
-		if wall.position.y < position.y and velocity.y < 0:
+		if paddle_rect.position.y < wall_rect.end.y and velocity.y < 0:
 			velocity.y = 0
 			position.y += wall_rect.end.y - paddle_rect.position.y
 			return
