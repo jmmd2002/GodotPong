@@ -2,6 +2,8 @@ extends Node
 
 const MAX_SPEED: float = 1600.0
 const VIEWPORT_SIZE: Vector2 = Vector2(1280, 720)
+const TARGET_FPS: int = 30
+const FRAME_DT: float = 1.0 / TARGET_FPS
 
 var PADDLE_SCENES: Dictionary = {
 	"coach":     Paddles.PADDLE_COACH,

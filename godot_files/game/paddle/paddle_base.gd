@@ -39,7 +39,7 @@ func _process(delta: float) -> void:
 	var dir: int = get_direction()
 	velocity.y = dir * speed
 
-	position += velocity * delta
+	position += velocity * Global.FRAME_DT
 	handle_collisions()
 
 

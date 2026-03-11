@@ -24,10 +24,10 @@ func _process(delta):
 		return
 
 	# Sub-step: split movement so the ball never travels more than its radius in one step
-	var num_steps: int = max(1, int(ceil(velocity.length() * delta / ball_radius)))
-	var sub_delta: float = delta / num_steps
+	var num_steps: int = max(1, int(ceil(velocity.length() * Global.FRAME_DT / ball_radius)))
+	var sub_delta: float = Global.FRAME_DT / num_steps
 	for _i in range(num_steps):
-		position += velocity * sub_delta
+		position += velocity * sub_delta  # sub_delta is derived from FRAME_DT
 		if handle_collisions():
 			return  # ball was destroyed by a kill zone, stop processing
 
