@@ -56,11 +56,15 @@ func set_ai_action(action: String) -> void:
 func handle_collisions() -> void:
 	var wall: Node = check_wall_collision()
 	if wall:
+		var paddle_rect: Rect2 = Utils.get_global_rect($CollisionShape2D)
+		var wall_rect: Rect2 = Utils.get_global_rect(wall.get_node("CollisionShape2D"))
 		if wall.position.y > position.y and velocity.y > 0:
 			velocity.y = 0
+			position.y -= paddle_rect.end.y - wall_rect.position.y
 			return
 		if wall.position.y < position.y and velocity.y < 0:
 			velocity.y = 0
+			position.y += wall_rect.end.y - paddle_rect.position.y
 			return
 
 func check_wall_collision() -> Node:
