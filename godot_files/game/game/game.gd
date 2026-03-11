@@ -2,6 +2,8 @@ extends Node2D
 
 @export var ball_scene: PackedScene
 
+var _initial_paddle_y: float
+
 func _ready() -> void:
 	var viewport_size: Vector2 = Vector2(
 		ProjectSettings.get_setting("display/window/size/viewport_width", 1280),
@@ -18,8 +20,9 @@ func _ready() -> void:
 		# joiner_id is only populated on the host — on the joiner use their own ID
 		paddle_b.net_id = NetworkManager.joiner_id if multiplayer.is_server() else multiplayer.get_unique_id()
 
-	paddle_a.position = Vector2(40.0, viewport_size.y / 2)
-	paddle_b.position = Vector2(viewport_size.x - 40.0, viewport_size.y / 2)
+	_initial_paddle_y = viewport_size.y / 2
+	paddle_a.position = Vector2(40.0, _initial_paddle_y)
+	paddle_b.position = Vector2(viewport_size.x - 40.0, _initial_paddle_y)
 
 	$Ball.position = Vector2(viewport_size.x / 2, viewport_size.y / 2)
 	$Ceiling.position = Vector2(0.0, 0.0)
@@ -105,7 +108,19 @@ func _rpc_sync_score(left: int, right: int) -> void:
 	GameManager.score_changed.emit(left, right)
 
 
+func _reset_paddles() -> void:
+	var pa: Node = get_node_or_null("PaddleA")
+	var pb: Node = get_node_or_null("PaddleB")
+	if pa:
+		pa.position.y = _initial_paddle_y
+		pa.net_target_y = _initial_paddle_y
+	if pb:
+		pb.position.y = _initial_paddle_y
+		pb.net_target_y = _initial_paddle_y
+
+
 func _on_ball_destroyed() -> void:
+	_reset_paddles()
 	# Tell joiner to also destroy their ball and spawn a fresh one
 	if Global.is_online and multiplayer.is_server():
 		_rpc_sync_ball_lifecycle.rpc_id(NetworkManager.joiner_id)
@@ -117,6 +132,7 @@ func _on_ball_destroyed() -> void:
 func _rpc_sync_ball_lifecycle() -> void:
 	for b in get_tree().get_nodes_in_group("ball"):
 		b.queue_free()
+	_reset_paddles()
 	spawn_ball()
 
 

@@ -28,6 +28,10 @@ Fonts="*uid://ccwboot8256hl"
 Sprites="*uid://cm176osxap5ij"
 Paddles="*uid://jlxy8obylye5"
 
+[debug]
+
+settings/stdout/print_fps=true
+
 [display]
 
 window/size/viewport_width=1280
