@@ -26,7 +26,7 @@ func _ready() -> void:
 func _spawn_paddle(placeholder: Node2D, mode: String, side: String, node_name: String) -> Node2D:
 	placeholder.free()
 	var scene_key: String = "manual_" + side if mode == "manual" else mode
-	var scene_path: String = Global.PADDLE_SCENES.get(scene_key, Global.PADDLE_SCENES["static"])
+	var scene_path: String = Paddles.PADDLE_SCENES.get(scene_key, Global.PADDLE_SCENES["static"])
 	var paddle: Node2D = (load(scene_path) as PackedScene).instantiate()
 	paddle.name = node_name
 	add_child(paddle)

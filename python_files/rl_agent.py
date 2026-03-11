@@ -50,6 +50,10 @@ class RLAgent(ABC):
         """Load previously saved parameters from ``filepath``."""
 
     @abstractmethod
+    def export_for_godot(self, output_path: str) -> None:
+        """Export learned parameters to a JSON file that Godot can consume directly."""
+
+    @abstractmethod
     def get_stats(self) -> Dict[str, Any]:
         """Return algorithm-specific diagnostics for logging/monitoring."""
 

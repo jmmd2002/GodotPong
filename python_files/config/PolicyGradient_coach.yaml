@@ -17,7 +17,7 @@ actions:
 
 # Learning hyperparameters
 hyperparameters:
-  alpha: 0.001  # Learning rate for gradient ascent — keep small; gradients are dense
+  alpha: 0.0001  # Learning rate for gradient ascent — keep small; gradients are dense
   gamma: 0.99    # Discount factor: how much future rewards matter (0 = myopic, 1 = full return)
 
 # Model persistence settings

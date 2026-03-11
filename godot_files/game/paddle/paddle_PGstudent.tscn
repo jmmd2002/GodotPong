@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://b4pgstudntscn"]
+
+[ext_resource type="Script" uid="uid://b2pgstudntgd3" path="res://game/paddle/paddle_PGstudent.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://bpsdh85m2dyv" path="res://assets/sprites/spr_paddle_tanned.png" id="2_sprite"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0001"]
+size = Vector2(20, 100)
+
+[node name="Paddle" type="Node2D" unique_id=293748561]
+script = ExtResource("1_script")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=184726395]
+texture = ExtResource("2_sprite")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=476182930]
+shape = SubResource("RectangleShape2D_0001")

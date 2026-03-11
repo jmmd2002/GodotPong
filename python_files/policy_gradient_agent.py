@@ -647,6 +647,40 @@ class PolicyGradientAgent(RLAgent):
 
         print(f"Policy loaded from {filepath}  (W shape {self.W.shape}, b shape {self.b.shape})")
 
+    def export_for_godot(self, output_path: str) -> None:
+        """
+        Export policy parameters to a JSON file that Godot can consume directly.
+
+        The file has the following structure:
+            {
+                "state_vars": ["paddle_y", "ball_x", ...],
+                "actions":    ["UP", "DOWN", "STAY"],
+                "W":          [[...], [...], [...]],   # shape (num_actions, state_dim)
+                "b":          [...]                    # shape (num_actions,)
+            }
+
+        Godot reads state_vars to build the state vector, then computes
+        logits = W @ s + b and picks argmax(softmax(logits)) as the action.
+        Training-only fields (alpha, gamma) are intentionally omitted.
+        """
+        with self._lock:
+            W_list = self.W.tolist()
+            b_list = self.b.tolist()
+
+        export_data = {
+            "state_vars": self.state_vars,
+            "actions":    self.actions,
+            "W":          W_list,
+            "b":          b_list,
+        }
+
+        out = Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "w") as f:
+            json.dump(export_data, f, indent=2)
+        print(f"Exported policy (Godot format) to {out}  "
+              f"(W shape {self.W.shape}, b shape {self.b.shape})")
+
     # ------------------------------------------------------------------
     # Step 7 — get_stats (mirrors QLearningAgent interface for logging)
     # ------------------------------------------------------------------

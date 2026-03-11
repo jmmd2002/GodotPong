@@ -5,16 +5,6 @@ const VIEWPORT_SIZE: Vector2 = Vector2(1280, 720)
 const TARGET_FPS: int = 30
 const FRAME_DT: float = 1.0 / TARGET_FPS
 
-var PADDLE_SCENES: Dictionary = {
-	"coach":     Paddles.PADDLE_COACH,
-	"student":   Paddles.PADDLE_STUDENT,
-	"homing":    Paddles.PADDLE_HOMING,
-	"static":    Paddles.PADDLE_STATIC,
-	"off":       Paddles.PADDLE_STATIC,
-	"manual_a":  Paddles.PADDLE_MANUAL_A,
-	"manual_b":  Paddles.PADDLE_MANUAL_B,
-}
-
 var is_host: bool = false
 var is_online: bool = false
 var join_ip: String = ""

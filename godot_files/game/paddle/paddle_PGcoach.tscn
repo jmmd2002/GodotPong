@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://b3pgcoachtscn"]
+
+[ext_resource type="Script" uid="uid://b1pgcoachs3gd" path="res://game/paddle/paddle_PGcoach.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://cwtb2efmpntm2" path="res://assets/sprites/spr_paddle_orange.png" id="2_sprite"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0001"]
+size = Vector2(20, 100)
+
+[node name="Paddle" type="Node2D" unique_id=830241763]
+script = ExtResource("1_script")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=541293817]
+texture = ExtResource("2_sprite")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=712845039]
+shape = SubResource("RectangleShape2D_0001")

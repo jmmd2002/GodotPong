@@ -88,7 +88,7 @@ func _rpc_receive_paddle_state(side: String, y: float, vel_y: float) -> void:
 
 
 func _spawn_paddle(mode: String, node_name: String) -> Node:
-	var scene_path: String = Global.PADDLE_SCENES.get(mode, Global.PADDLE_SCENES["manual_a"])
+	var scene_path: String = Paddles.PADDLE_SCENES.get(mode)
 	var paddle: Node = load(scene_path).instantiate()
 	paddle.name = node_name
 	add_child(paddle)
