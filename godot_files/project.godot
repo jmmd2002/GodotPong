@@ -12,8 +12,8 @@ config_version=5
 
 config/name="Pong"
 run/main_scene="uid://cijla3bhj7w8i"
-run/max_fps=30
 config/features=PackedStringArray("4.6", "Forward Plus")
+run/max_fps=30
 run/load_shell_environment=true
 config/icon="res://icon.svg"
 
@@ -28,10 +28,6 @@ Paths="*uid://cnmjai53mfybr"
 Fonts="*uid://ccwboot8256hl"
 Sprites="*uid://cm176osxap5ij"
 Paddles="*uid://jlxy8obylye5"
-
-[debug]
-
-settings/stdout/print_fps=true
 
 [display]
 
