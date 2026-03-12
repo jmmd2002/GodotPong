@@ -7,7 +7,7 @@ source python_files/.venv/bin/activate
 BASE_PORT=5000
 NUM_WORKERS=$(python -c "
 import yaml
-with open('python_files/config/PolicyGradient_coach.yaml') as f:
+with open('python_files/config/PolicyGradientDNN_coach.yaml') as f:
     c = yaml.safe_load(f)
 print(c.get('model', {}).get('num_workers', 1))
 ")
@@ -37,7 +37,7 @@ sleep 0.1
 GODOT_PIDS=()
 for i in $(seq 0 $((NUM_WORKERS - 1))); do
     PORT=$((BASE_PORT + i))
-    godot --path godot_files/ -- --port $PORT &
+    godot --headless --path godot_files/ -- --port $PORT &
     GODOT_PIDS+=("$!")
     echo "Godot instance $i started on port $PORT (PID: ${GODOT_PIDS[-1]})"
     sleep 0.1

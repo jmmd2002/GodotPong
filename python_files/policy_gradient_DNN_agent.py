@@ -20,7 +20,6 @@ AND fast → reinforce UP strongly".
 
 import json
 import os
-import queue
 import random
 import tempfile
 import threading
@@ -155,6 +154,15 @@ class PolicyGradientDNNAgent(RLAgent):
         # _forward is a static method (pure function) so jit can trace it.
         self._forward_jit = jax.jit(PolicyGradientDNNAgent._forward)
 
+        # JIT-compile the gradient computation once at construction time.
+        # jax.value_and_grad returns both the loss scalar and the gradient dict.
+        # Wrapping with jax.jit means XLA compiles the full backward pass once
+        # (on the first call) and reuses the compiled kernel for every subsequent
+        # episode — instead of retracing the computation graph each episode.
+        self._loss_and_grad_jit = jax.jit(
+            jax.value_and_grad(PolicyGradientDNNAgent._episode_loss)
+        )
+
         # --- per-thread trajectory buffer --------------------------------
         # Each worker thread accumulates its own episode independently.
         # At episode end the gradient is computed and the shared params
@@ -165,25 +173,9 @@ class PolicyGradientDNNAgent(RLAgent):
         self._local = threading.local()
 
         # --- shared parameter update lock --------------------------------
-        # Protects self.params when multiple worker threads update it
-        # simultaneously — same pattern as the linear agent's _lock.
+        # Protects self.params during save() which may be called from a
+        # different thread (e.g. the autosave timer in main.py).
         self._lock = threading.Lock()
-
-        # --- gradient update queue ---------------------------------------
-        # A single background thread pulls completed episodes off this queue
-        # and runs the JAX gradient computation one at a time, in order.
-        # This avoids two problems that arise from spawning a new thread per
-        # episode:
-        #   1. Two threads racing to read self.params before either has
-        #      applied its update (stale-gradient / Hogwild! problem).
-        #   2. Unbounded thread creation when episodes end quickly.
-        # Putting (states, action_ids, rewards) on the queue is O(1) and
-        # returns immediately, so Godot is never blocked.
-        self._grad_queue: queue.Queue = queue.Queue()
-        self._grad_worker_thread = threading.Thread(
-            target=self._gradient_worker, daemon=True
-        )
-        self._grad_worker_thread.start()
 
         # --- statistics --------------------------------------------------
         self._episodes_completed  = 0     # total episodes that triggered an update
@@ -767,84 +759,43 @@ class PolicyGradientDNNAgent(RLAgent):
         if not done:
             return
 
-        # Snapshot and clear the trajectory immediately so the next episode
-        # can start accumulating without waiting for the gradient update.
+        # Snapshot and clear the trajectory immediately.
         states     = [entry[0] for entry in self._trajectory]   # list of jnp arrays
         action_ids = [entry[1] for entry in self._trajectory]   # list of ints
         rewards    = [entry[2] for entry in self._trajectory]   # list of floats
         self._trajectory = []
 
-        # Hand the episode off to the single gradient worker thread.
-        # This returns immediately — Godot is never blocked waiting for JAX.
-        # The worker processes episodes one at a time in arrival order,
-        # so each gradient is always computed against the most-recent params.
-        self._grad_queue.put((states, action_ids, rewards))
-        # On-policy approximation note:
-        # The new episode begins before the worker finishes computing the
-        # gradient for this one.  This means the first few frames of the next
-        # episode are collected under the OLD policy (while JAX is running),
-        # and the remaining frames are collected under the NEW policy (after
-        # the worker writes self.params).  REINFORCE strictly requires the
-        # entire trajectory to be sampled from a single consistent policy.
-        # In practice this is an accepted approximation: with a small learning
-        # rate the old and new policies are nearly identical, so the
-        # contaminated frames at the start of the episode have negligible
-        # effect.  The alternative — blocking here until the queue drains —
-        # would reintroduce the Godot freeze we removed.
+        # Stack into JAX arrays for vectorised processing.
+        states_arr     = jnp.stack(states)                       # (T, state_dim)
+        action_ids_arr = jnp.array(action_ids, dtype=jnp.int32)  # (T,)
+        returns_arr    = self._compute_returns(rewards)           # (T,)
 
-    # ------------------------------------------------------------------
-    # Gradient worker (single background thread)
-    # ------------------------------------------------------------------
+        # Compute loss and gradients via the JIT-compiled function.
+        # XLA reuses the compiled kernel from the first episode onward,
+        # so this is fast enough to run inline without blocking Godot.
+        loss, grads = self._loss_and_grad_jit(
+            self.params, states_arr, action_ids_arr, returns_arr
+        )
 
-    def _gradient_worker(self) -> None:
-        """Drain _grad_queue and apply one gradient update per episode.
+        grad_norm = float(
+            jnp.sqrt(sum(
+                jnp.sum(g ** 2) for g in jax.tree.leaves(grads)
+            ))
+        )
 
-        Runs forever as a daemon thread (started in __init__).  Processing
-        episodes serially means each update sees the params left by the
-        previous update — no stale-gradient race between concurrent threads.
-        """
-        while True:
-            states, action_ids, rewards = self._grad_queue.get()
-
-            # Stack into JAX arrays for vectorised processing
-            states_arr     = jnp.stack(states)                       # (T, state_dim)
-            action_ids_arr = jnp.array(action_ids, dtype=jnp.int32)  # (T,)
-            returns_arr    = self._compute_returns(rewards)           # (T,)
-
-            # Snapshot the current params under the lock so the gradient is
-            # computed against a consistent version (not one being written by
-            # another thread's save() or a future update slipping in).
-            with self._lock:
-                params_snapshot = self.params
-
-            # Heavy JAX / XLA work runs outside the lock so other threads
-            # (e.g. autosave in main.py) are not blocked during computation.
-            loss, grads = jax.value_and_grad(
-                PolicyGradientDNNAgent._episode_loss
-            )(params_snapshot, states_arr, action_ids_arr, returns_arr)
-
-            grad_norm = float(
-                jnp.sqrt(sum(
-                    jnp.sum(g ** 2) for g in jax.tree.leaves(grads)
-                ))
+        # Apply the gradient update and record stats under the lock so
+        # save() (called from a separate thread) never sees a half-written state.
+        with self._lock:
+            self.params = jax.tree.map(
+                lambda p, g: p - self.alpha * g,
+                self.params, grads,
             )
-
-            # Apply the update and record stats, both under the lock.
-            # After this assignment, the next process_state call on any thread
-            # immediately uses the new policy — the transition is instantaneous.
-            with self._lock:
-                self.params = jax.tree.map(
-                    lambda p, g: p - self.alpha * g,
-                    self.params, grads,
-                )
-                self._episodes_completed  += 1
-                self._updates_count       += len(rewards)
-                self._last_loss            = float(loss)
-                self._last_episode_return  = float(sum(rewards))
-                self._last_episode_length  = len(rewards)
-                self._last_grad_norm       = grad_norm
-
-            self._grad_queue.task_done()
+            self._episodes_completed  += 1
+            self._updates_count       += len(rewards)
+            self._last_loss            = float(loss)
+            self._last_episode_return  = float(sum(rewards))
+            self._last_episode_length  = len(rewards)
+            self._last_grad_norm       = grad_norm
 
     # ------------------------------------------------------------------
     # save and load
