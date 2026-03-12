@@ -9,8 +9,9 @@ from pathlib import Path
 from rl_agent import RLAgent
 from qlearning_agent import QLearningAgent
 from policy_gradient_agent import PolicyGradientAgent
-from stats_logger import StatsLogger, QLearningStatsLogger, PolicyGradientStatsLogger
-from live_plotter import Plotter, QLearningLivePlotter, PolicyGradientLivePlotter
+from policy_gradient_DNN_agent import PolicyGradientDNNAgent
+from stats_logger import StatsLogger, QLearningStatsLogger, PolicyGradientStatsLogger, PolicyGradientDNNStatsLogger
+from live_plotter import Plotter, QLearningLivePlotter, PolicyGradientLivePlotter, PolicyGradientDNNLivePlotter
 
 
 # Maps training_mode (from Godot handshake) to the config file to load
@@ -26,22 +27,32 @@ POLICY_GRADIENT_CONFIG_MAP: dict[str, Path] = {
     "vs_coach":  Path(__file__).parent / "config" / "PolicyGradient_config.yaml",
     "coach":     Path(__file__).parent / "config" / "PolicyGradient_coach.yaml",
 }
+POLICY_GRADIENT_DNN_CONFIG_MAP: dict[str, Path] = {
+    "vs_static": Path(__file__).parent / "config" / "PolicyGradientDNN_student.yaml",
+    "vs_homing": Path(__file__).parent / "config" / "PolicyGradientDNN_student.yaml",
+    "vs_coach":  Path(__file__).parent / "config" / "PolicyGradientDNN_student.yaml",
+    "coach":     Path(__file__).parent / "config" / "PolicyGradientDNN_coach.yaml",
+}
 METHODS_MAP: dict[str, dict] = {
-    "qvalue": QVALUE_CONFIG_MAP,
-    "policy_gradient": POLICY_GRADIENT_CONFIG_MAP,
+    "qvalue":               QVALUE_CONFIG_MAP,
+    "policy_gradient":      POLICY_GRADIENT_CONFIG_MAP,
+    "policy_gradient_dnn":  POLICY_GRADIENT_DNN_CONFIG_MAP,
 }
 
 AGENTS_MAP: dict[str, type] = {
-    "qvalue": QLearningAgent,
-    "policy_gradient": PolicyGradientAgent,
+    "qvalue":              QLearningAgent,
+    "policy_gradient":     PolicyGradientAgent,
+    "policy_gradient_dnn": PolicyGradientDNNAgent,
 }
 LOGGERS_MAP: dict[str, type] = {
-    "qvalue": QLearningStatsLogger,
-    "policy_gradient": PolicyGradientStatsLogger,
+    "qvalue":              QLearningStatsLogger,
+    "policy_gradient":     PolicyGradientStatsLogger,
+    "policy_gradient_dnn": PolicyGradientDNNStatsLogger,
 }
 PLOTTERS_MAP: dict[str, type] = {
-    "qvalue": QLearningLivePlotter,
-    "policy_gradient": PolicyGradientLivePlotter,
+    "qvalue":              QLearningLivePlotter,
+    "policy_gradient":     PolicyGradientLivePlotter,
+    "policy_gradient_dnn": PolicyGradientDNNLivePlotter,
 }
 
 HOST = "127.0.0.1"
@@ -382,8 +393,8 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
 def main():
     """Start all workers and wait for Ctrl+C."""
     training_method, training_mode = receive_handshake()
-    training_method = "qvalue"  #for headless training
-    training_mode = "coach" #for headless training
+    #training_method = "qvalue"  #for headless training
+    #training_mode = "coach" #for headless training
     agent, config = load_agent(training_method, training_mode)
 
     model_config: dict = validate_model_config(config.get("model"))

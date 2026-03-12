@@ -21,6 +21,7 @@ func _ready() -> void:
 
 
 func _on_ball_destroyed() -> void:
+	paddle_a.position.y = Global.VIEWPORT_SIZE.y / 2
 	spawn_ball()
 
 

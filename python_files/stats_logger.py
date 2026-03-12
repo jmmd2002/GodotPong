@@ -197,6 +197,66 @@ class PolicyGradientStatsLogger(StatsLogger):
         return row
 
 
+class PolicyGradientDNNStatsLogger(StatsLogger):
+    """
+    StatsLogger for the REINFORCE policy gradient agent — DNN (JAX MLP) version.
+
+    Compared to PolicyGradientStatsLogger (linear agent):
+      - Individual bias terms (b_0/b_1/b_2) are dropped: for a multi-layer
+        network the output biases are far less interpretable because hidden-layer
+        representations dominate. Logging them would be misleading.
+      - Separate grad_norm_W / grad_norm_b are merged into a single grad_norm
+        that spans all layers, matching what the DNN agent computes.
+
+    Extra columns logged per record:
+        pg_episodes     — total episodes that triggered a gradient update
+        pg_loss         — policy loss from the most recent episode
+        episode_return  — sum of rewards in the last finished episode
+        episode_length  — number of steps in the last finished episode
+        avg_w           — mean |weight| across all W matrices
+        max_w           — max |weight| across all W matrices
+        std_w           — std of all weights across all W matrices
+        avg_entropy     — H(π) at zero state (proxy for policy confidence)
+        grad_norm       — L2 norm of the full gradient across all layers
+        updates         — total timesteps processed
+    """
+
+    AGENT_NAME = "PolicyGradientDNN"
+
+    EXTRA_FIELDS = [
+        "pg_episodes",
+        "pg_loss",
+        "episode_return",
+        "episode_length",
+        "avg_w",
+        "max_w",
+        "std_w",
+        "avg_entropy",
+        "grad_norm",
+        "updates",
+    ]
+
+    def _build_extra_row(self, stats: dict) -> dict:
+        # Return empty strings for all extra fields when no stats dict is
+        # provided (e.g. non-primary workers). This keeps CSV columns blank
+        # rather than filled with misleading zeros.
+        if not stats:
+            return {field: "" for field in self.EXTRA_FIELDS}
+
+        return {
+            "pg_episodes":    stats.get("episodes", 0),
+            "pg_loss":        round(stats.get("last_loss", 0.0), 6),
+            "episode_return": round(stats.get("episode_return", 0.0), 6),
+            "episode_length": stats.get("episode_length", 0),
+            "avg_w":          round(stats.get("avg_w", 0.0), 6),
+            "max_w":          round(stats.get("max_w", 0.0), 6),
+            "std_w":          round(stats.get("std_w", 0.0), 6),
+            "avg_entropy":    round(stats.get("avg_entropy", 0.0), 6),
+            "grad_norm":      round(stats.get("grad_norm", 0.0), 6),
+            "updates":        stats.get("updates", 0),
+        }
+
+
 class QLearningStatsLogger(StatsLogger):
     """
     StatsLogger for Q-learning (value iteration).
@@ -218,6 +278,7 @@ class QLearningStatsLogger(StatsLogger):
         "q_coverage",
         "avg_q",
         "max_q",
+        "min_q",
         "std_q",
         "exploration_rate",
         "updates",
@@ -233,6 +294,7 @@ class QLearningStatsLogger(StatsLogger):
             "q_coverage":       round(stats.get("q_coverage", 0.0), 4),
             "avg_q":            round(stats.get("avg_q", 0.0), 6),
             "max_q":            round(stats.get("max_q", 0.0), 6),
+            "min_q":            round(stats.get("min_q", 0.0), 6),
             "std_q":            round(stats.get("std_q", 0.0), 6),
             "exploration_rate": round(stats.get("exploration_rate", 0.0), 2),
             "updates":          stats.get("updates", 0),

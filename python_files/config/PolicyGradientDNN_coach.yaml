@@ -1,0 +1,39 @@
+# REINFORCE Policy Gradient Agent — DNN version (JAX) — Coach
+
+# State variables (continuous, normalised to [-1, 1] by Godot)
+# Coach only sees its own paddle — no opponent paddle in state
+state:
+  - paddle_y
+  - ball_x
+  - ball_y
+  - ball_vx
+  - ball_vy
+
+# Available actions
+actions:
+  - UP
+  - DOWN
+  - STAY
+
+# Learning hyperparameters
+hyperparameters:
+  alpha: 0.01        # Learning rate — smaller than linear agent; DNN gradients are denser
+  gamma: 0.99         # Discount factor: 0 = myopic, 1 = full return
+  hidden_sizes: [128, 64]   # MLP hidden layer widths: state_dim→128→64→num_actions
+
+# Model persistence settings
+model:
+  path: models/policy_dnn_coach.json
+  load_on_start: true
+  save_on_exit: true
+  autosave_every_n_steps: 1000
+  num_workers: 1
+
+# Logging / monitoring settings
+logs:
+  log_enabled: true
+  log_every_n_steps: 100
+  log_dir: logs
+  reward_window: 20   # episodes
+  plot_enabled: true
+  plot_refresh_interval: 5.0   # seconds
