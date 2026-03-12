@@ -30,6 +30,7 @@ model:
 
 # Logging / monitoring settings
 logs:
+  log_enabled: true
   log_every_n_steps: 100
   log_dir: logs
   reward_window: 20

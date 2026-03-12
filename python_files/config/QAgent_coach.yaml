@@ -39,6 +39,7 @@ model:
 
 # Logging / monitoring settings
 logs:
+  log_enabled: true                 # Master switch: false disables all logging and CSV output
   log_every_n_steps: 100            # How often worker 0 records a stats snapshot (0 disables)
   log_dir: logs                     # Relative to python_files/; a timestamped subfolder is created here
   reward_window: 20                 # Number of recent episodes used to compute avg reward

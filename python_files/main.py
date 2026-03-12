@@ -181,6 +181,7 @@ def validate_log_config(config) -> dict:
 
     # Required types; plot_refresh_interval accepts both int and float
     required_types = {
+        "log_enabled": bool,
         "log_every_n_steps": int,
         "log_dir": str,
         "reward_window": int,
@@ -393,6 +394,7 @@ def main():
     num_workers: int = int(model_config.get("num_workers"))
 
     log_config: dict = validate_log_config(config.get("logs"))
+    log_enabled: bool = log_config.get("log_enabled")
     log_every_n_steps: int = log_config.get("log_every_n_steps")
     log_base_dir: Path = Path(__file__).parent / log_config.get("log_dir")
     reward_window: int = log_config.get("reward_window")
@@ -426,8 +428,9 @@ def main():
 
     # Stats logger (worker 0 records into it; main saves CSV on exit).
     # Also holds the shared episode reward pool across all workers.
+    # Disabled entirely when log_enabled is false — no recording, no CSV output.
     logger_cls = LOGGERS_MAP[training_method]
-    stats_logger: StatsLogger = logger_cls() if plot_enabled else None
+    stats_logger: StatsLogger = logger_cls() if log_enabled else None
 
     # Start all workers FIRST so every port is bound before matplotlib
     # touches the Tk event loop (plt.pause on a background thread blocks on Linux).
@@ -458,9 +461,10 @@ def main():
     # to stall the process and delay worker socket binding.
     # If plotting is disabled, the main thread simply waits for shutdown_event.
     plotter_cls = PLOTTERS_MAP[training_method]
-    plotter: Plotter = plotter_cls(stats_logger, refresh_interval=plot_refresh_interval, reward_window=reward_window) if plot_enabled else None
+    _plot_active = plot_enabled and log_enabled  # plotting requires logging to be enabled
+    plotter: Plotter = plotter_cls(stats_logger, refresh_interval=plot_refresh_interval, reward_window=reward_window) if _plot_active else None
     try:
-        if plot_enabled:
+        if _plot_active:
             plotter._run(shutdown_event)   # blocks until shutdown_event is set
         else:
             shutdown_event.wait()          # no plot; just wait for workers to finish
