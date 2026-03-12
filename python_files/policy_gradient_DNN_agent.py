@@ -116,7 +116,7 @@ class PolicyGradientDNNAgent(RLAgent):
                           Example: ["paddle_y", "ball_x", "ball_y", "ball_vx", "ball_vy"]
             actions:      List of action strings.
                           Example: ["UP", "DOWN", "STAY"]
-            alpha:        Learning rate for gradient ascent. Must be in (0, 1].
+            alpha:        Learning rate for gradient ascent. Must be strictly positive.
             gamma:        Discount factor in [0, 1].
             hidden_sizes: List of hidden layer widths, e.g. [128, 64].
                           Determines the MLP architecture:
@@ -184,6 +184,7 @@ class PolicyGradientDNNAgent(RLAgent):
         self._last_episode_return = 0.0   # sum of rewards in the last finished episode
         self._last_episode_length = 0     # number of steps in the last finished episode
         self._last_grad_norm      = 0.0   # L2 norm of the full gradient at last update
+        self._last_entropy        = 0.0   # H(π) at zero state, cached after each gradient step
 
     # ------------------------------------------------------------------
     # Parameter initialisation
@@ -292,7 +293,7 @@ class PolicyGradientDNNAgent(RLAgent):
         are validated together here.
 
         Valid ranges / rules:
-            alpha        : (0, 1]   — learning rate, must be strictly positive
+            alpha        : > 0       — learning rate, must be strictly positive
             gamma        : [0, 1]   — discount factor, 0 = myopic, 1 = full return
             hidden_sizes : non-empty list of strictly positive integers
                            e.g. [128, 64] → two hidden layers of width 128 and 64.
@@ -303,10 +304,10 @@ class PolicyGradientDNNAgent(RLAgent):
             ValueError: If any value is missing, non-numeric, or out of range.
                         No default fallback — the caller must supply valid values.
         """
-        if not isinstance(self.alpha, (int, float)) or not (0 < self.alpha <= 1):
+        if not isinstance(self.alpha, (int, float)) or not (self.alpha > 0):
             raise ValueError(
                 f"alpha={self.alpha!r} is invalid. "
-                "Must be a number in the range (0, 1]."
+                "Must be a strictly positive number."
             )
         if not isinstance(self.gamma, (int, float)) or not (0 <= self.gamma <= 1):
             raise ValueError(
@@ -786,16 +787,40 @@ class PolicyGradientDNNAgent(RLAgent):
         # Apply the gradient update and record stats under the lock so
         # save() (called from a separate thread) never sees a half-written state.
         with self._lock:
+            print(self.params["W0"][0][:5])  # print first 5 weights of W0 before the update
+            print(grads["W2"][0][:5])   # print first 5 gradients of W0
             self.params = jax.tree.map(
                 lambda p, g: p - self.alpha * g,
                 self.params, grads,
             )
+            print(self.params["W0"][0][:5])  # print first 5 weights of W0 after the update
             self._episodes_completed  += 1
             self._updates_count       += len(rewards)
             self._last_loss            = float(loss)
             self._last_episode_return  = float(sum(rewards))
             self._last_episode_length  = len(rewards)
             self._last_grad_norm       = grad_norm
+            # Cache entropy at the new params — JIT-compiled, fast after warmup.
+            # Doing it here avoids recomputing a forward pass in get_stats().
+            s_zero = jnp.zeros(self.state_dim)
+            pi_zero = np.array(self._forward_jit(self.params, s_zero))
+            self._last_entropy = float(
+                -np.sum(pi_zero * np.log(np.clip(pi_zero, 1e-8, 1.0)))
+            )
+
+    # ------------------------------------------------------------------
+    # Cheap per-episode scalar properties
+    # ------------------------------------------------------------------
+
+    @property
+    def last_loss(self) -> float:
+        """Policy loss from the most recent gradient update (thread-safe read)."""
+        return self._last_loss
+
+    @property
+    def last_entropy(self) -> float:
+        """H(π) at zero state from the most recent gradient update (thread-safe read)."""
+        return self._last_entropy
 
     # ------------------------------------------------------------------
     # save and load
@@ -976,7 +1001,7 @@ class PolicyGradientDNNAgent(RLAgent):
             avg_w          — mean |weight| across all layers
             max_w          — max |weight| across all layers
             std_w          — std of all weights across all layers
-            avg_entropy    — H(π) at zero state = -Σ π log π
+            avg_entropy    — H(π) at zero state (cached from last gradient step)
             grad_norm      — L2 norm of full gradient at last update
         """
         with self._lock:
@@ -987,20 +1012,20 @@ class PolicyGradientDNNAgent(RLAgent):
             last_episode_return   = self._last_episode_return
             last_episode_length   = self._last_episode_length
             last_grad_norm        = self._last_grad_norm
+            last_entropy          = self._last_entropy
 
         # Aggregate weight stats across all W matrices (skip biases)
-        all_weights = np.concatenate([
-            params_snap[k].ravel()
-            for k in params_snap if k.startswith("W")
-        ])
+        layer_keys = sorted(k for k in params_snap if k.startswith("W"))
+        all_weights = np.concatenate([params_snap[k].ravel() for k in layer_keys])
         avg_w = float(np.abs(all_weights).mean())
         max_w = float(np.abs(all_weights).max())
         std_w = float(all_weights.std())
 
-        # Entropy at zero state — runs through JIT forward pass
-        s_zero = jnp.zeros(self.state_dim)
-        pi_zero = np.array(self._forward_jit(self.params, s_zero))
-        avg_entropy = float(-np.sum(pi_zero * np.log(np.clip(pi_zero, 1e-8, 1.0))))
+        # Per-layer mean |W| — keyed as avg_w_0, avg_w_1, …
+        per_layer_avg_w = {
+            f"avg_w_{i}": round(float(np.abs(params_snap[k]).mean()), 6)
+            for i, k in enumerate(layer_keys)
+        }
 
         return {
             "episodes":        episodes_completed,
@@ -1011,8 +1036,9 @@ class PolicyGradientDNNAgent(RLAgent):
             "avg_w":           round(avg_w, 6),
             "max_w":           round(max_w, 6),
             "std_w":           round(std_w, 6),
-            "avg_entropy":     round(avg_entropy, 6),
+            "avg_entropy":     round(last_entropy, 6),
             "grad_norm":       round(last_grad_norm, 6),
+            **per_layer_avg_w,
         }
 
     # ------------------------------------------------------------------

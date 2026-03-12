@@ -196,7 +196,7 @@ class PolicyGradientLivePlotter(Plotter):
     Shows:
         1) Average reward (last N episodes) over steps
         2) Policy loss over steps
-        3) Episode return and entropy over steps
+        3) Policy entropy over steps
         4) Bias terms b_0, b_1, b_2 over steps
 
     Args:
@@ -239,11 +239,9 @@ class PolicyGradientLivePlotter(Plotter):
         ax_loss_r = ax_loss.twinx()
         ax_loss_r.set_ylabel("Grad Norm")
 
-        ax_return.set_title("Episode Return / Entropy")
+        ax_return.set_title("Entropy")
         ax_return.set_xlabel("Step")
-        ax_return.set_ylabel("Return")
-        ax_return_r = ax_return.twinx()
-        ax_return_r.set_ylabel("Entropy")
+        ax_return.set_ylabel("Entropy")
 
         ax_bias.set_title("Bias Terms (b_i)")
         ax_bias.set_xlabel("Step")
@@ -253,7 +251,7 @@ class PolicyGradientLivePlotter(Plotter):
 
         while not shutdown_event.is_set():
             try:
-                self._redraw(fig, ax_reward, ax_loss, ax_loss_r, ax_return, ax_return_r, ax_bias)
+                self._redraw(fig, ax_reward, ax_loss, ax_loss_r, ax_return, ax_bias)
             except Exception as e:
                 print(f"[PolicyGradientLivePlotter] Draw error: {e}")
 
@@ -266,7 +264,7 @@ class PolicyGradientLivePlotter(Plotter):
 
     def _redraw(self, fig: plt.Figure, ax_reward: plt.Axes, ax_loss: plt.Axes,
                 ax_loss_r: plt.Axes, ax_return: plt.Axes,
-                ax_return_r: plt.Axes, ax_bias: plt.Axes) -> None:
+                ax_bias: plt.Axes) -> None:
         """Pull latest data from the logger and redraw all subplots."""
         with self._logger._lock:
             snapshot = list(self._logger._buffer)
@@ -316,24 +314,13 @@ class PolicyGradientLivePlotter(Plotter):
         handles_r, labels_r = ax_loss_r.get_legend_handles_labels()
         ax_loss.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
 
-        # --- Episode return + entropy ---
+        # --- Entropy ---
         ax_return.cla()
-        ax_return_r.cla()
-        ax_return.set_title("Episode Return / Entropy")
+        ax_return.set_title("Entropy")
         ax_return.set_xlabel("Step")
-        ax_return.set_ylabel("Return")
-        ax_return.plot(steps, [r.get("episode_return", 0.0) for r in w0_rows],
-                       color="tab:green", label="Episode return")
-
-        ax_return_r.set_ylabel("Entropy")
-        ax_return_r.plot(steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
-                         color="tab:orange", label="Entropy")
-
-        # Merge handles from both y-axes into a single legend.
-        # Each twin axis keeps its own handle list, so we must collect both.
-        handles_l, labels_l = ax_return.get_legend_handles_labels()
-        handles_r, labels_r = ax_return_r.get_legend_handles_labels()
-        ax_return.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+        ax_return.set_ylabel("Entropy")
+        ax_return.plot(steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
+                       color="tab:orange", label="Entropy")
 
         # --- Bias terms ---
         ax_bias.cla()
@@ -356,8 +343,8 @@ class PolicyGradientDNNLivePlotter(Plotter):
     Four subplots:
         1. Avg reward (pooled, window=N episodes) over steps
         2. Policy loss over steps
-        3. Episode return (left axis) + policy entropy at zero state (right twin axis)
-        4. Weight magnitude: avg_w ± std_w ribbon (left axis)
+        3. Policy entropy over steps
+        4. Per-layer mean |W| (one line per weight matrix, left axis)
            + gradient norm across all layers (right twin axis)
 
     Subplot 4 replaces the bias-terms chart used by the linear plotter:
@@ -401,17 +388,15 @@ class PolicyGradientDNNLivePlotter(Plotter):
         ax_reward.set_xlabel("Step")
         ax_reward.set_ylabel("Reward")
 
-        ax_loss.set_title("Policy Loss")
+        ax_loss.set_title("Avg Policy Loss (pooled)")
         ax_loss.set_xlabel("Step")
         ax_loss.set_ylabel("Loss")
 
-        ax_return.set_title("Episode Return / Entropy")
+        ax_return.set_title("Avg Entropy (pooled)")
         ax_return.set_xlabel("Step")
-        ax_return.set_ylabel("Return")
-        ax_return_r = ax_return.twinx()
-        ax_return_r.set_ylabel("Entropy")
+        ax_return.set_ylabel("Entropy")
 
-        ax_weights.set_title("Weight Stats / Grad Norm")
+        ax_weights.set_title("Per-Layer |w| / Grad Norm")
         ax_weights.set_xlabel("Step")
         ax_weights.set_ylabel("|w|")
         ax_weights_r = ax_weights.twinx()
@@ -424,7 +409,7 @@ class PolicyGradientDNNLivePlotter(Plotter):
                 self._redraw(
                     fig,
                     ax_reward, ax_loss,
-                    ax_return, ax_return_r,
+                    ax_return,
                     ax_weights, ax_weights_r,
                 )
             except Exception as e:
@@ -443,7 +428,6 @@ class PolicyGradientDNNLivePlotter(Plotter):
         ax_reward:    plt.Axes,
         ax_loss:      plt.Axes,
         ax_return:    plt.Axes,
-        ax_return_r:  plt.Axes,
         ax_weights:   plt.Axes,
         ax_weights_r: plt.Axes,
     ) -> None:
@@ -476,51 +460,39 @@ class PolicyGradientDNNLivePlotter(Plotter):
 
         # --- 2. Policy loss ---
         ax_loss.cla()
-        ax_loss.set_title("Policy Loss")
+        ax_loss.set_title(f"Avg Policy Loss (pooled, window={self._reward_window} eps)")
         ax_loss.set_xlabel("Step")
         ax_loss.set_ylabel("Loss")
-        ax_loss.plot(steps, [r.get("pg_loss", 0.0) for r in w0_rows], color="tab:red")
+        ax_loss.plot(steps, [r.get("avg_loss", 0.0) for r in w0_rows], color="tab:red")
 
-        # --- 3. Episode return + entropy (twin axes) ---
+        # --- 3. Entropy ---
         ax_return.cla()
-        ax_return_r.cla()
-        ax_return.set_title("Episode Return / Entropy")
+        ax_return.set_title(f"Avg Entropy (pooled, window={self._reward_window} eps)")
         ax_return.set_xlabel("Step")
-        ax_return.set_ylabel("Return")
+        ax_return.set_ylabel("Entropy")
         ax_return.plot(
-            steps, [r.get("episode_return", 0.0) for r in w0_rows],
-            color="tab:green", label="Episode return",
-        )
-        ax_return_r.set_ylabel("Entropy")
-        ax_return_r.plot(
             steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
             color="tab:orange", label="Entropy",
         )
-        handles_l, labels_l = ax_return.get_legend_handles_labels()
-        handles_r, labels_r = ax_return_r.get_legend_handles_labels()
-        ax_return.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
 
-        # --- 4. Weight magnitude ± std ribbon  +  grad norm (twin axis) ---
-        # avg_w and std_w reflect the mean and spread of |W| across ALL layers.
-        # A healthy network should show gradual growth from near-zero at init.
+        # --- 4. Per-layer mean |W| + grad norm (twin axis) ---
+        # One line per weight matrix (avg_w_0 = input→hidden1, …, avg_w_N = hidden→output).
         # grad_norm (right axis) spans all layers: a sudden spike indicates
         # gradient explosion; a value staying at 0 suggests vanishing gradients.
-        avg_w  = [r.get("avg_w", 0.0) for r in w0_rows]
-        std_w  = [r.get("std_w", 0.0) for r in w0_rows]
-        gnorm  = [r.get("grad_norm", 0.0) for r in w0_rows]
+        layer_keys = sorted(k for k in w0_rows[0] if k.startswith("avg_w_"))
+        gnorm = [r.get("grad_norm", 0.0) for r in w0_rows]
 
         ax_weights.cla()
         ax_weights_r.cla()
-        ax_weights.set_title("Weight Stats / Grad Norm")
+        ax_weights.set_title("Per-Layer |w| / Grad Norm")
         ax_weights.set_xlabel("Step")
         ax_weights.set_ylabel("|w|")
-        ax_weights.plot(steps, avg_w, color="tab:blue", label="avg |w|")
-        ax_weights.fill_between(
-            steps,
-            [a - s for a, s in zip(avg_w, std_w)],
-            [a + s for a, s in zip(avg_w, std_w)],
-            alpha=0.2, color="tab:blue", label="±std",
-        )
+        colors = plt.cm.tab10.colors
+        num_layers = len(layer_keys)
+        for i, key in enumerate(layer_keys):
+            label = f"W{i} (out)" if i == num_layers - 1 else f"W{i}"
+            ax_weights.plot(steps, [r.get(key, 0.0) for r in w0_rows],
+                            color=colors[i % len(colors)], label=label)
         ax_weights_r.set_ylabel("Grad Norm")
         ax_weights_r.plot(steps, gnorm, color="tab:red", label="grad norm", linewidth=0.8)
 

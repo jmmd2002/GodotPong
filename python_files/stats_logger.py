@@ -46,6 +46,8 @@ class StatsLogger(ABC):
     def __init__(self) -> None:
         self._buffer: list[dict] = []
         self._episode_rewards: list[float] = []
+        self._episode_losses: list[float] = []
+        self._episode_entropies: list[float] = []
         self._lock = threading.Lock()
 
     def add_episode_reward(self, reward: float, window: int) -> None:
@@ -59,6 +61,32 @@ class StatsLogger(ABC):
         """Return the mean reward over the current pool (thread-safe)."""
         with self._lock:
             pool = list(self._episode_rewards)
+        return sum(pool) / len(pool) if pool else 0.0
+
+    def add_episode_loss(self, loss: float, window: int) -> None:
+        """Append a completed episode's policy loss to the shared pool (thread-safe)."""
+        with self._lock:
+            self._episode_losses.append(loss)
+            if len(self._episode_losses) > window:
+                self._episode_losses.pop(0)
+
+    def avg_episode_loss(self) -> float:
+        """Return the mean loss over the current pool (thread-safe)."""
+        with self._lock:
+            pool = list(self._episode_losses)
+        return sum(pool) / len(pool) if pool else 0.0
+
+    def add_episode_entropy(self, entropy: float, window: int) -> None:
+        """Append a completed episode's entropy to the shared pool (thread-safe)."""
+        with self._lock:
+            self._episode_entropies.append(entropy)
+            if len(self._episode_entropies) > window:
+                self._episode_entropies.pop(0)
+
+    def avg_episode_entropy(self) -> float:
+        """Return the mean entropy over the current pool (thread-safe)."""
+        with self._lock:
+            pool = list(self._episode_entropies)
         return sum(pool) / len(pool) if pool else 0.0
 
     @abstractmethod
@@ -210,22 +238,22 @@ class PolicyGradientDNNStatsLogger(StatsLogger):
 
     Extra columns logged per record:
         pg_episodes     — total episodes that triggered a gradient update
-        pg_loss         — policy loss from the most recent episode
+        avg_loss        — windowed mean policy loss (same window as avg_reward)
         episode_return  — sum of rewards in the last finished episode
         episode_length  — number of steps in the last finished episode
         avg_w           — mean |weight| across all W matrices
         max_w           — max |weight| across all W matrices
         std_w           — std of all weights across all W matrices
-        avg_entropy     — H(π) at zero state (proxy for policy confidence)
+        avg_entropy     — windowed mean H(π) at zero state (same window as avg_reward)
         grad_norm       — L2 norm of the full gradient across all layers
         updates         — total timesteps processed
     """
 
     AGENT_NAME = "PolicyGradientDNN"
 
-    EXTRA_FIELDS = [
+    _BASE_EXTRA_FIELDS = [
         "pg_episodes",
-        "pg_loss",
+        "avg_loss",
         "episode_return",
         "episode_length",
         "avg_w",
@@ -236,6 +264,17 @@ class PolicyGradientDNNStatsLogger(StatsLogger):
         "updates",
     ]
 
+    # EXTRA_FIELDS is set as an instance attribute in __init__ so that
+    # per-layer avg_w_N columns can be appended once the architecture is known.
+    EXTRA_FIELDS: list[str] = _BASE_EXTRA_FIELDS
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Own copy so extending it doesn't affect the class-level list or
+        # other instances.
+        self.EXTRA_FIELDS = list(self._BASE_EXTRA_FIELDS)
+        self._layer_fields_added = False
+
     def _build_extra_row(self, stats: dict) -> dict:
         # Return empty strings for all extra fields when no stats dict is
         # provided (e.g. non-primary workers). This keeps CSV columns blank
@@ -243,18 +282,29 @@ class PolicyGradientDNNStatsLogger(StatsLogger):
         if not stats:
             return {field: "" for field in self.EXTRA_FIELDS}
 
-        return {
+        # On the first real record, discover per-layer keys and register them
+        # so they appear as CSV columns.
+        if not self._layer_fields_added:
+            for key in sorted(k for k in stats if k.startswith("avg_w_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            self._layer_fields_added = True
+
+        row = {
             "pg_episodes":    stats.get("episodes", 0),
-            "pg_loss":        round(stats.get("last_loss", 0.0), 6),
+            "avg_loss":        round(self.avg_episode_loss(), 6),
             "episode_return": round(stats.get("episode_return", 0.0), 6),
             "episode_length": stats.get("episode_length", 0),
             "avg_w":          round(stats.get("avg_w", 0.0), 6),
             "max_w":          round(stats.get("max_w", 0.0), 6),
             "std_w":          round(stats.get("std_w", 0.0), 6),
-            "avg_entropy":    round(stats.get("avg_entropy", 0.0), 6),
+            "avg_entropy":    round(self.avg_episode_entropy(), 6),
             "grad_norm":      round(stats.get("grad_norm", 0.0), 6),
             "updates":        stats.get("updates", 0),
         }
+        for key in (k for k in self.EXTRA_FIELDS if k.startswith("avg_w_")):
+            row[key] = round(stats.get(key, 0.0), 6)
+        return row
 
 
 class QLearningStatsLogger(StatsLogger):

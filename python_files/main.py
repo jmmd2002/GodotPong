@@ -346,6 +346,8 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
                         total_games += 1
                         if stats_logger is not None:
                             stats_logger.add_episode_reward(current_episode_reward, reward_window)
+                            stats_logger.add_episode_loss(getattr(agent, 'last_loss', 0.0), reward_window)
+                            stats_logger.add_episode_entropy(getattr(agent, 'last_entropy', 0.0), reward_window)
                         current_episode_reward = 0.0
 
                     # Autosave: only worker 0 saves — all workers share the same agent,
