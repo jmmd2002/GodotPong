@@ -106,13 +106,11 @@ func send_state() -> int:
 	var score_right_current: int = game_manager.score_right
 
 	if score_left_current > score_left_prev:
-		prev_reward = 1.0
-		if score_left_current >= MAX_SCORE or score_right_current >= MAX_SCORE:
-			done = true
+		prev_reward = 5.0
+		done = true
 	elif score_right_current > score_right_prev:
 		prev_reward = -1.0
-		if score_left_current >= MAX_SCORE or score_right_current >= MAX_SCORE:
-			done = true
+		done = true
 	elif prev_ball_vx < 0.0 and ball.velocity.x > 0.0:
 		prev_reward = 0.1  # PaddleA hit the ball
 
