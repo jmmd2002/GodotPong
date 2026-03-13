@@ -17,7 +17,7 @@ actions:
 
 # Learning hyperparameters
 hyperparameters:
-  alpha: 0.003   # Learning rate for gradient ascent — keep small; gradients are dense
+  alpha: 0.005   # Learning rate for gradient ascent — keep small; gradients are dense
   gamma: 0.99    # Discount factor: how much future rewards matter (0 = myopic, 1 = full return)
 
 # Model persistence settings
@@ -26,7 +26,7 @@ model:
   load_on_start: true
   save_on_exit: true
   autosave_every_n_steps: 100
-  num_workers: 2
+  num_workers: 1
 
 # Logging / monitoring settings
 logs:
@@ -34,5 +34,5 @@ logs:
   log_every_n_steps: 100
   log_dir: logs
   reward_window: 20
-  plot_enabled: false
+  plot_enabled: true
   plot_refresh_interval: 5.0

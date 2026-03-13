@@ -24,9 +24,9 @@ QVALUE_CONFIG_MAP: dict[str, Path] = {
     "coach":     Path(__file__).parent / "config" / "QAgent_coach.yaml",
 }
 POLICY_GRADIENT_CONFIG_MAP: dict[str, Path] = {
-    "vs_static": Path(__file__).parent / "config" / "PolicyGradient_config.yaml",
-    "vs_homing": Path(__file__).parent / "config" / "PolicyGradient_config.yaml",
-    "vs_coach":  Path(__file__).parent / "config" / "PolicyGradient_config.yaml",
+    "vs_static": Path(__file__).parent / "config" / "PolicyGradient_student.yaml",
+    "vs_homing": Path(__file__).parent / "config" / "PolicyGradient_student.yaml",
+    "vs_coach":  Path(__file__).parent / "config" / "PolicyGradient_student.yaml",
     "coach":     Path(__file__).parent / "config" / "PolicyGradient_coach.yaml",
 }
 POLICY_GRADIENT_DNN_CONFIG_MAP: dict[str, Path] = {
@@ -425,8 +425,8 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
 def main():
     """Start all workers and wait for Ctrl+C."""
     training_method, training_mode = receive_handshake()
-    training_method = "policy_gradient_dnn"  #for headless training
-    training_mode = "coach" #for headless training
+    training_method = "policy_gradient"  #for headless training
+    training_mode = "vs_coach" #for headless training
     agent, config = load_agent(training_method, training_mode)
 
     model_config: dict = validate_model_config(config.get("model"))

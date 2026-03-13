@@ -59,14 +59,14 @@ func _ready() -> void:
 
 func _on_vs_static_pressed() -> void:
 	Global.training_mode = "vs_static"
-	Global.paddle_a_mode = "ai_training_paddle"
+	Global.paddle_a_mode = "ai_training"
 	Global.paddle_b_mode = "static"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_RUN)
 
 
 func _on_vs_homing_pressed() -> void:
 	Global.training_mode = "vs_homing"
-	Global.paddle_a_mode = "ai_training_paddle"
+	Global.paddle_a_mode = "ai_training"
 	Global.paddle_b_mode = "homing"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_RUN)
 
@@ -74,15 +74,15 @@ func _on_vs_homing_pressed() -> void:
 func _on_vs_coach_pressed() -> void:
 	# PaddleA trains against the pre-trained coach model
 	Global.training_mode = "vs_coach"
-	Global.paddle_a_mode = "ai_training_paddle"
-	Global.paddle_b_mode = "coach"
+	Global.paddle_a_mode = "ai_training"
+	Global.paddle_b_mode = Global.paddle_prefix + "coach"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_RUN)
 
 
 func _on_coach_pressed() -> void:
 	# Trains coach to train Qagent later
 	Global.training_mode = "coach"
-	Global.paddle_a_mode = "ai_training_paddle"
+	Global.paddle_a_mode = "ai_training"
 	Global.paddle_b_mode = "off"
 	get_tree().change_scene_to_file(Paths.COACH_TRAINING)
 

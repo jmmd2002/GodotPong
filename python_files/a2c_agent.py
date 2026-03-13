@@ -364,12 +364,8 @@ class A2CAgent(RLAgent):
                 The factor 2 compensates for ReLU zeroing ~half the neurons,
                 keeping activation variance ≈ 1 across all hidden layers.
 
-            Output layer   → small constant std = 0.01
-                Actor:  near-zero logits → softmax ≈ uniform → maximum entropy
-                        from episode 1, so early episodes explore freely.
-                Critic: near-zero value estimates → no initial bias about state
-                        values; the critic learns from scratch without fighting
-                        a large random offset.
+            Output layer   → Xavier (Glorot): std = √(1 / n_in)
+                No ReLU follows the output so the He factor-2 is not needed.
 
             Biases → all zeros (standard; biases are learned from there).
 
@@ -389,7 +385,7 @@ class A2CAgent(RLAgent):
         for i, (n_in, n_out) in enumerate(zip(layer_sizes[:-1], layer_sizes[1:])):
             key, subkey = jax.random.split(key)
             is_output = (i == num_layers - 1)
-            std = 0.01 if is_output else jnp.sqrt(2.0 / n_in)
+            std = jnp.sqrt(1.0 / n_in) if is_output else jnp.sqrt(2.0 / n_in)
             params[f"W{i}"] = jax.random.normal(subkey, (n_out, n_in)) * std
             params[f"b{i}"] = jnp.zeros(n_out)
 
@@ -635,9 +631,9 @@ class A2CAgent(RLAgent):
             No activation = the output layer is a plain linear projection,
             which can represent any scalar in ℝ.
 
-        The output layer of _init_params uses a small fixed std (0.01) so the
-        critic starts with near-zero value estimates rather than large random
-        offsets — it learns purely from observed returns.
+        The output layer of _init_params uses Xavier initialisation (not He)
+        precisely because there is no ReLU following it — He's factor-of-2
+        correction is only needed when the next operation is ReLU.
 
         Args:
             params: Critic parameter dict with keys "W0","b0","W1","b1",...

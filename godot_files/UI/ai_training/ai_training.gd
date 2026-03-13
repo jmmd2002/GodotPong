@@ -8,7 +8,7 @@ var paddle_b: Node2D
 func _ready() -> void:
 	var viewport_size: Vector2 = Global.VIEWPORT_SIZE
 
-	paddle_a = $PaddleA
+	paddle_a = _spawn_paddle($PaddleA, Global.paddle_a_mode, "a", "PaddleA")
 	paddle_a.position = Vector2(40.0, viewport_size.y / 2)
 
 	paddle_b = _spawn_paddle($PaddleB, Global.paddle_b_mode, "b", "PaddleB")
@@ -26,7 +26,7 @@ func _ready() -> void:
 func _spawn_paddle(placeholder: Node2D, mode: String, side: String, node_name: String) -> Node2D:
 	placeholder.free()
 	var scene_key: String = "manual_" + side if mode == "manual" else mode
-	var scene_path: String = Paddles.PADDLE_SCENES.get(scene_key, Global.PADDLE_SCENES["static"])
+	var scene_path: String = Paddles.PADDLE_SCENES.get(scene_key)
 	var paddle: Node2D = (load(scene_path) as PackedScene).instantiate()
 	paddle.name = node_name
 	add_child(paddle)

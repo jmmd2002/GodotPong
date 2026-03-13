@@ -1,6 +1,7 @@
 extends Node
 
 # --- Paddle Scenes ---
+const PADDLE_AI: String = "res://game/paddle/paddle_ai.tscn"
 const PADDLE_QCOACH:    String = "res://game/paddle/paddle_Qcoach.tscn"
 const PADDLE_QSTUDENT:  String = "res://game/paddle/paddle_Qstudent.tscn"
 const PADDLE_POLGRADCOACH:    String = "res://game/paddle/paddle_PGcoach.tscn"
@@ -12,6 +13,7 @@ const PADDLE_MANUAL_B: String = "res://game/paddle/paddle_manual_b.tscn"
 
 
 var PADDLE_SCENES: Dictionary = {
+	"ai_training": PADDLE_AI,
 	"Qcoach":     PADDLE_QCOACH,
 	"Qstudent":   PADDLE_QSTUDENT,
 	"PolGradcoach": PADDLE_POLGRADCOACH,
