@@ -7,12 +7,13 @@ import threading
 from pathlib import Path
 
 from a2c_agent import A2CAgent
+from ppo_agent import PPOAgent
 from rl_agent import RLAgent
 from qlearning_agent import QLearningAgent
 from policy_gradient_agent import PolicyGradientAgent
 from policy_gradient_DNN_agent import PolicyGradientDNNAgent
-from stats_logger import StatsLogger, QLearningStatsLogger, PolicyGradientStatsLogger, PolicyGradientDNNStatsLogger, A2CStatsLogger
-from live_plotter import Plotter, QLearningLivePlotter, PolicyGradientLivePlotter, PolicyGradientDNNLivePlotter, A2CLivePlotter
+from stats_logger import StatsLogger, QLearningStatsLogger, PolicyGradientStatsLogger, PolicyGradientDNNStatsLogger, A2CStatsLogger, PPOStatsLogger
+from live_plotter import Plotter, QLearningLivePlotter, PolicyGradientLivePlotter, PolicyGradientDNNLivePlotter, A2CLivePlotter, PPOLivePlotter
 
 
 # Maps training_mode (from Godot handshake) to the config file to load
@@ -42,11 +43,19 @@ A2C_CONFIG_MAP: dict[str, Path] = {
     "coach":     Path(__file__).parent / "config" / "A2C_coach.yaml",
 }
 
+PPO_CONFIG_MAP: dict[str, Path] = {
+    "vs_static": Path(__file__).parent / "config" / "PPO_student.yaml",
+    "vs_homing": Path(__file__).parent / "config" / "PPO_student.yaml",
+    "vs_coach":  Path(__file__).parent / "config" / "PPO_student.yaml",
+    "coach":     Path(__file__).parent / "config" / "PPO_coach.yaml",
+}
+
 METHODS_MAP: dict[str, dict] = {
     "qvalue":               QVALUE_CONFIG_MAP,
     "policy_gradient":      POLICY_GRADIENT_CONFIG_MAP,
     "policy_gradient_dnn":  POLICY_GRADIENT_DNN_CONFIG_MAP,
-    "a2c": A2C_CONFIG_MAP,
+    "a2c":                  A2C_CONFIG_MAP,
+    "ppo":                  PPO_CONFIG_MAP,
 }
 
 AGENTS_MAP: dict[str, type] = {
@@ -54,12 +63,14 @@ AGENTS_MAP: dict[str, type] = {
     "policy_gradient":     PolicyGradientAgent,
     "policy_gradient_dnn": PolicyGradientDNNAgent,
     "a2c":                 A2CAgent,
+    "ppo":                 PPOAgent,
 }
 LOGGERS_MAP: dict[str, type] = {
     "qvalue":              QLearningStatsLogger,
     "policy_gradient":     PolicyGradientStatsLogger,
     "policy_gradient_dnn": PolicyGradientDNNStatsLogger,
     "a2c":                 A2CStatsLogger,
+    "ppo":                 PPOStatsLogger,
 }
 
 PLOTTERS_MAP: dict[str, type] = {
@@ -67,6 +78,7 @@ PLOTTERS_MAP: dict[str, type] = {
     "policy_gradient":     PolicyGradientLivePlotter,
     "policy_gradient_dnn": PolicyGradientDNNLivePlotter,
     "a2c":                 A2CLivePlotter,
+    "ppo":                 PPOLivePlotter,
 }
 
 HOST = "127.0.0.1"
@@ -364,6 +376,8 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
                             stats_logger.add_episode_entropy(getattr(agent, 'last_entropy', 0.0), reward_window)
                             if hasattr(stats_logger, 'add_episode_critic_loss'):
                                 stats_logger.add_episode_critic_loss(getattr(agent, 'last_critic_loss', 0.0), reward_window)
+                            if hasattr(stats_logger, 'add_episode_approx_kl'):
+                                stats_logger.add_episode_approx_kl(getattr(agent, '_last_approx_kl', 0.0), reward_window)
                         current_episode_reward = 0.0
 
                     # Autosave: only worker 0 saves — all workers share the same agent,
@@ -411,8 +425,8 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
 def main():
     """Start all workers and wait for Ctrl+C."""
     training_method, training_mode = receive_handshake()
-    #training_method = "policy_gradient_dnn"  #for headless training
-    #training_mode = "coach" #for headless training
+    training_method = "policy_gradient_dnn"  #for headless training
+    training_mode = "coach" #for headless training
     agent, config = load_agent(training_method, training_mode)
 
     model_config: dict = validate_model_config(config.get("model"))

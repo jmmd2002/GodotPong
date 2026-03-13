@@ -1,0 +1,89 @@
+# Proximal Policy Optimization (PPO-Clip) Agent — Coach
+#
+# The coach only sees its own paddle + the ball (no opponent paddle).
+# It is trained in "coach" mode: it plays against the student and
+# provides a moving target that keeps the student challenged.
+
+# State variables (continuous, normalised to [-1, 1] by Godot)
+state:
+  - paddle_y
+  - ball_x
+  - ball_y
+  - ball_vx
+  - ball_vy
+
+# Available actions
+actions:
+  - UP
+  - DOWN
+  - STAY
+
+# Learning hyperparameters
+hyperparameters:
+  # Actor learning rate.
+  # Slightly smaller than A2C: PPO already gets K×more gradient steps per
+  # episode (n_epochs), so each individual step can be more conservative.
+  alpha_actor:  0.0003
+
+  # Critic learning rate.
+  # Larger than actor: the critic solves an MSE regression problem (smoother
+  # loss surface) and must track the shifting value targets quickly enough
+  # that the GAE advantage estimates remain informative.
+  alpha_critic: 0.001
+
+  # Discount factor: 0 = myopic, 1 = full return.
+  gamma: 0.99
+
+  # GAE smoothing parameter λ ∈ [0, 1].
+  # λ = 0 → pure 1-step TD (low variance, biased by imperfect V).
+  # λ = 1 → Monte Carlo (unbiased, high variance).
+  # 0.95 is the near-universal practical default.
+  gae_lambda: 0.95
+
+  # PPO clipping range ε.
+  # The probability ratio r_t = π_new/π_old is clipped to [1-ε, 1+ε].
+  # Smaller ε → more conservative per-episode updates.
+  # Too small → learning stalls (gradient always clipped).
+  # Too large → equivalent to no clipping (reverts to A2C instability).
+  clip_epsilon: 0.2
+
+  # Number of gradient update passes (epochs) on each episode's data.
+  # K=4 is conservative; K=8–10 extracts more signal but risks overfitting
+  # to one episode's noise once the policy drifts past clip_epsilon.
+  n_epochs: 4
+
+  # MLP hidden layer widths — actor and critic sized separately.
+  actor_hidden_sizes:  [64, 64]
+
+  # Critic sees a harder regression target (V^π(s) shifts as policy improves).
+  # Extra capacity helps it stay accurate.
+  # Actor:  state_dim → 64  → 64 → num_actions
+  # Critic: state_dim → 128 → 64 → 1
+  critic_hidden_sizes: [128, 64]
+
+  # Entropy bonus weight c_H.
+  # Prevents the policy from collapsing onto one action before exploring.
+  # 0.01 is a good starting point.
+  entropy_coef: 0.01
+
+  # Critic loss weight (logging / diagnostics only).
+  # Actor and critic are updated with SEPARATE gradient passes, so critic_coef
+  # does NOT affect actual weight updates — it is stored for reference only.
+  critic_coef: 0.5
+
+# Model persistence settings
+model:
+  path: models/ppo_coach.json
+  load_on_start: true
+  save_on_exit: true
+  autosave_every_n_steps: 1000
+  num_workers: 1
+
+# Logging / monitoring settings
+logs:
+  log_enabled: true
+  log_every_n_steps: 100
+  log_dir: logs
+  reward_window: 20
+  plot_enabled: true
+  plot_refresh_interval: 5.0

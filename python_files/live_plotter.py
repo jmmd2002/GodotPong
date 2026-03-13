@@ -695,3 +695,204 @@ class A2CLivePlotter(Plotter):
 
         fig.tight_layout(pad=3.0)
         fig.canvas.draw_idle()
+
+
+class PPOLivePlotter(Plotter):
+    """
+    Live plot window for the PPO-Clip agent.
+
+    Four subplots:
+        1. Avg reward (pooled, window=N episodes) over steps
+        2. Actor loss (left axis) + Critic loss (right twin axis) over steps
+        3. Policy entropy (left axis) + Clip fraction and Approx KL (right twin axis)
+        4. Per-layer actor mean |W| (left axis) + Actor & critic grad norms
+           (right twin axis) over steps
+
+    The third subplot is the PPO-specific addition: clip_fraction and approx_kl
+    are the key diagnostics for monitoring whether the policy is updating at a
+    healthy rate.  clip_fraction > 0.3 or approx_kl > 0.1 both signal that the
+    policy is moving too aggressively and hyperparameters need adjustment.
+
+    Args:
+        logger:           A PPOStatsLogger instance to read from.
+        refresh_interval: Seconds between plot refreshes. Default: 5.0
+        reward_window:    Episode window size shown in the avg reward title.
+    """
+
+    def __init__(self, logger, refresh_interval: float = 5.0, reward_window: int = 20) -> None:
+        super().__init__(refresh_interval=refresh_interval)
+        self._logger = logger
+        self._reward_window = reward_window
+        self._thread: threading.Thread | None = None
+
+    def start(self, shutdown_event: threading.Event) -> None:
+        """Start the background plotting thread."""
+        self._thread = threading.Thread(
+            target=self._run,
+            args=(shutdown_event,),
+            daemon=True,
+            name="ppo-live-plotter",
+        )
+        self._thread.start()
+
+    def _run(self, shutdown_event: threading.Event) -> None:
+        plt.ion()
+        fig, axes = plt.subplots(2, 2, figsize=(12, 7))
+        fig.suptitle("PPO Training Progress", fontsize=13)
+        fig.tight_layout(pad=3.0)
+
+        ax_reward, ax_loss, ax_ppo, ax_weights = axes.flatten()
+
+        ax_reward.set_title("Avg Reward (pooled)")
+        ax_reward.set_xlabel("Step")
+        ax_reward.set_ylabel("Reward")
+
+        ax_loss.set_title("Actor Loss / Critic Loss")
+        ax_loss.set_xlabel("Step")
+        ax_loss.set_ylabel("Actor Loss")
+        ax_loss_r = ax_loss.twinx()
+        ax_loss_r.set_ylabel("Critic Loss")
+
+        ax_ppo.set_title("Entropy / Clip Fraction / Approx KL")
+        ax_ppo.set_xlabel("Step")
+        ax_ppo.set_ylabel("Entropy")
+        ax_ppo_r = ax_ppo.twinx()
+        ax_ppo_r.set_ylabel("Clip Fraction / Approx KL")
+
+        ax_weights.set_title("Per-Layer Actor |w| / Grad Norms")
+        ax_weights.set_xlabel("Step")
+        ax_weights.set_ylabel("|w|")
+        ax_weights_r = ax_weights.twinx()
+        ax_weights_r.set_ylabel("Grad Norm")
+
+        plt.show(block=False)
+
+        while not shutdown_event.is_set():
+            try:
+                self._redraw(
+                    fig,
+                    ax_reward,
+                    ax_loss,    ax_loss_r,
+                    ax_ppo,     ax_ppo_r,
+                    ax_weights, ax_weights_r,
+                )
+            except Exception as e:
+                print(f"[PPOLivePlotter] Draw error: {e}")
+
+            for _ in range(int(self._refresh_interval / 0.5)):
+                if shutdown_event.is_set():
+                    break
+                plt.pause(0.5)
+
+        plt.close(fig)
+
+    def _redraw(
+        self,
+        fig:          plt.Figure,
+        ax_reward:    plt.Axes,
+        ax_loss:      plt.Axes,
+        ax_loss_r:    plt.Axes,
+        ax_ppo:       plt.Axes,
+        ax_ppo_r:     plt.Axes,
+        ax_weights:   plt.Axes,
+        ax_weights_r: plt.Axes,
+    ) -> None:
+        """Pull latest data from the logger and redraw all subplots."""
+        with self._logger._lock:
+            snapshot = list(self._logger._buffer)
+
+        if len(snapshot) < 2:
+            return
+
+        by_worker: dict[int, list[dict]] = {}
+        for r in snapshot:
+            by_worker.setdefault(r["worker_id"], []).append(r)
+
+        w0_rows = by_worker.get(0, [])
+        if len(w0_rows) < 2:
+            return
+
+        steps = [r["step"] for r in w0_rows]
+
+        # --- 1. Avg reward ---
+        ax_reward.cla()
+        ax_reward.set_title(f"Avg Reward (pooled, window={self._reward_window} eps)")
+        ax_reward.set_xlabel("Step")
+        ax_reward.set_ylabel("Reward")
+        ax_reward.plot(steps, [r["avg_reward"] for r in w0_rows], color="tab:blue")
+
+        # --- 2. Actor loss (left) / Critic loss (right twin) ---
+        ax_loss.cla()
+        ax_loss_r.cla()
+        ax_loss.set_title(f"Actor Loss / Critic Loss (avg over {self._reward_window} eps)")
+        ax_loss.set_xlabel("Step")
+        ax_loss.set_ylabel("Actor Loss")
+        ax_loss_r.set_ylabel("Critic Loss")
+        ax_loss.plot(steps, [r.get("avg_actor_loss", 0.0) for r in w0_rows],
+                     color="tab:blue", label="actor loss")
+        ax_loss_r.plot(steps, [r.get("avg_critic_loss", 0.0) for r in w0_rows],
+                       color="tab:orange", linewidth=0.9, linestyle="--", label="critic loss")
+        handles_l, labels_l = ax_loss.get_legend_handles_labels()
+        handles_r, labels_r = ax_loss_r.get_legend_handles_labels()
+        ax_loss.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+
+        # --- 3. PPO-specific: Entropy + Clip Fraction + Approx KL ---
+        # Entropy (left axis): falling entropy means the policy is converging to
+        # confident action choices.  It should drop gradually, not instantly.
+        #
+        # Clip fraction (right axis, solid): fraction of timesteps where
+        # |r_t − 1| > ε.  Healthy: 0.05 – 0.20.  Red dashed reference at 0.2.
+        #
+        # Approx KL (right axis, dashed): total policy shift across K epochs.
+        # Healthy: 0.01 – 0.05.  Orange dashed reference at 0.05.
+        ax_ppo.cla()
+        ax_ppo_r.cla()
+        ax_ppo.set_title("Entropy / Clip Fraction / Approx KL")
+        ax_ppo.set_xlabel("Step")
+        ax_ppo.set_ylabel("Entropy")
+        ax_ppo_r.set_ylabel("Clip Frac / Approx KL")
+
+        ax_ppo.plot(steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
+                    color="tab:green", label="entropy")
+        ax_ppo_r.plot(steps, [r.get("clip_fraction", 0.0) for r in w0_rows],
+                      color="tab:red", linewidth=0.9, label="clip frac")
+        ax_ppo_r.plot(steps, [r.get("avg_approx_kl", 0.0) for r in w0_rows],
+                      color="tab:orange", linewidth=0.9, linestyle="--", label="approx KL")
+
+        # Reference lines for healthy ranges
+        ax_ppo_r.axhline(0.2,  color="tab:red",    linewidth=0.5, linestyle=":")
+        ax_ppo_r.axhline(0.05, color="tab:orange", linewidth=0.5, linestyle=":")
+
+        handles_l, labels_l = ax_ppo.get_legend_handles_labels()
+        handles_r, labels_r = ax_ppo_r.get_legend_handles_labels()
+        ax_ppo.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+
+        # --- 4. Per-layer actor |W| + grad norms ---
+        layer_keys   = sorted(k for k in w0_rows[0] if k.startswith("avg_w_actor_"))
+        actor_gnorm  = [r.get("actor_grad_norm",  0.0) for r in w0_rows]
+        critic_gnorm = [r.get("critic_grad_norm", 0.0) for r in w0_rows]
+
+        ax_weights.cla()
+        ax_weights_r.cla()
+        ax_weights.set_title("Per-Layer Actor |w| / Grad Norms")
+        ax_weights.set_xlabel("Step")
+        ax_weights.set_ylabel("|w|")
+        colors = plt.cm.tab10.colors
+        num_layers = len(layer_keys)
+        for i, key in enumerate(layer_keys):
+            label = f"W{i} (out)" if i == num_layers - 1 else f"W{i}"
+            ax_weights.plot(
+                steps, [r.get(key, 0.0) for r in w0_rows],
+                color=colors[i % len(colors)], label=label,
+            )
+        ax_weights_r.set_ylabel("Grad Norm")
+        ax_weights_r.plot(steps, actor_gnorm,  color="tab:red",    linewidth=0.8, label="actor ‖∇‖")
+        ax_weights_r.plot(steps, critic_gnorm, color="tab:purple", linewidth=0.8,
+                          linestyle="--", label="critic ‖∇‖")
+
+        handles_l, labels_l = ax_weights.get_legend_handles_labels()
+        handles_r, labels_r = ax_weights_r.get_legend_handles_labels()
+        ax_weights.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+
+        fig.tight_layout(pad=3.0)
+        fig.canvas.draw_idle()
