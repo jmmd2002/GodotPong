@@ -102,6 +102,7 @@ func send_state() -> int:
 	if score_right_current > score_right_prev:
 		prev_reward = -1.0  # missed the ball
 		done = true
+		prev_ball_vx = 0.0  # reset so new ball spawn doesn't trigger a false hit reward
 	elif prev_ball_vx < 0.0 and ball.velocity.x > 0.0:
 		prev_reward = 0.5   # paddle hit the ball back toward the wall
 		episode_hit_count += 1

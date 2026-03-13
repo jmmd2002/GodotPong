@@ -108,9 +108,11 @@ func send_state() -> int:
 	if score_left_current > score_left_prev:
 		prev_reward = 5.0
 		done = true
+		prev_ball_vx = 0.0  # reset so new ball spawn doesn't trigger a false hit reward
 	elif score_right_current > score_right_prev:
 		prev_reward = -1.0
 		done = true
+		prev_ball_vx = 0.0  # reset so new ball spawn doesn't trigger a false hit reward
 	elif prev_ball_vx < 0.0 and ball.velocity.x > 0.0:
 		prev_reward = 0.1  # PaddleA hit the ball
 
