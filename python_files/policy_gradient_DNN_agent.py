@@ -784,17 +784,6 @@ class PolicyGradientDNNAgent(RLAgent):
             ))
         )
 
-        # ── debug: one line per episode ───────────────────────────────────
-        ep_num = self._episodes_completed + 1
-        T      = len(rewards)
-        print(
-            f"[PG-DNN ep={ep_num}] "
-            f"T={T} | "
-            f"Σr={sum(rewards):+.3f} | "
-            f"G_hat∈[{float(returns_arr.min()):.3f}, {float(returns_arr.max()):.3f}] | "
-            f"∇={grad_norm:.4f}"
-        )
-
         # Apply the gradient update and record stats under the lock so
         # save() (called from a separate thread) never sees a half-written state.
         with self._lock:
