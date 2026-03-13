@@ -712,7 +712,7 @@ class PolicyGradientDNNAgent(RLAgent):
         # REINFORCE loss: negate because we want gradient ASCENT on J(θ),
         # but jax.grad performs gradient DESCENT (subtracts gradient).
         # Minimising -J == maximising J.
-        return -jnp.mean(returns * log_probs)
+        return -jnp.sum(returns * log_probs)
 
     # ------------------------------------------------------------------
     # update — accumulate trajectory, apply gradient at episode end
@@ -784,16 +784,24 @@ class PolicyGradientDNNAgent(RLAgent):
             ))
         )
 
+        # ── debug: one line per episode ───────────────────────────────────
+        ep_num = self._episodes_completed + 1
+        T      = len(rewards)
+        print(
+            f"[PG-DNN ep={ep_num}] "
+            f"T={T} | "
+            f"Σr={sum(rewards):+.3f} | "
+            f"G_hat∈[{float(returns_arr.min()):.3f}, {float(returns_arr.max()):.3f}] | "
+            f"∇={grad_norm:.4f}"
+        )
+
         # Apply the gradient update and record stats under the lock so
         # save() (called from a separate thread) never sees a half-written state.
         with self._lock:
-            print(self.params["W0"][0][:5])  # print first 5 weights of W0 before the update
-            print(grads["W2"][0][:5])   # print first 5 gradients of W0
             self.params = jax.tree.map(
                 lambda p, g: p - self.alpha * g,
                 self.params, grads,
             )
-            print(self.params["W0"][0][:5])  # print first 5 weights of W0 after the update
             self._episodes_completed  += 1
             self._updates_count       += len(rewards)
             self._last_loss            = float(loss)

@@ -45,6 +45,15 @@ theme_override_font_sizes/font_size = 18
 layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+
+[node name="A2CButton" type="Button" parent="." unique_id=1160726537]
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
 
 [node name="BackButton" type="Button" parent="." unique_id=1531458772]
 layout_mode = 0

@@ -3,8 +3,10 @@ extends Control
 @onready var label: Label = $Title
 @onready var q_learning_button: Button = $QLearningButton
 @onready var policy_gradient_button: Button = $PolicyIterationButton
-@onready var back_button: Button = $BackButton
 @onready var policy_gradient_DNN_button: Button = $PolicyIterationDNNButton
+@onready var A2C_button: Button = $A2CButton
+@onready var back_button: Button = $BackButton
+
 
 
 func _ready() -> void:
@@ -37,10 +39,15 @@ func _ready() -> void:
 	policy_gradient_button.add_theme_stylebox_override("normal", style)
 	policy_gradient_button.add_theme_stylebox_override("hover", style_hover)
 	
-	policy_gradient_DNN_button.text = "Policy Gradient DNN"
+	policy_gradient_DNN_button.text = "Policy Grad DNN"
 	policy_gradient_DNN_button.size = button_size
 	policy_gradient_DNN_button.add_theme_stylebox_override("normal", style)
 	policy_gradient_DNN_button.add_theme_stylebox_override("hover", style_hover)
+	
+	A2C_button.text = "Actor to Critic"
+	A2C_button.size = button_size
+	A2C_button.add_theme_stylebox_override("normal", style)
+	A2C_button.add_theme_stylebox_override("hover", style_hover)
 	
 	back_button.size = Vector2(80.0, 24.0)
 	back_button.text = "< Back"
@@ -51,13 +58,15 @@ func _ready() -> void:
 
 	q_learning_button.position = Vector2(center_x, start_y)
 	policy_gradient_button.position = Vector2(center_x, start_y + button_size.y + small_spacing)
-	policy_gradient_DNN_button.position = Vector2(center_x, start_y + button_size.y + 2 * small_spacing)
+	policy_gradient_DNN_button.position = Vector2(center_x, start_y + 2*button_size.y + 2*small_spacing)
+	A2C_button.position = Vector2(center_x, start_y + 3*button_size.y + 3*small_spacing)
 	
 	back_button.position = Vector2(small_spacing, viewport_size.y - back_button.size.y - small_spacing)
 
 	q_learning_button.pressed.connect(_on_q_learning_pressed)
 	policy_gradient_button.pressed.connect(_on_policy_gradient_pressed)
 	policy_gradient_DNN_button.pressed.connect(_on_policy_gradient_DNN_pressed)
+	A2C_button.pressed.connect(_on_A2C_pressed)
 	back_button.pressed.connect(_on_back_pressed)
 
 
@@ -73,6 +82,10 @@ func _on_policy_gradient_pressed() -> void:
 
 func _on_policy_gradient_DNN_pressed() -> void:
 	Global.training_method = "policy_gradient_dnn"
+	get_tree().change_scene_to_file(Paths.AI_TRAINING_MENU)
+
+func _on_A2C_pressed() -> void:
+	Global.training_method = "a2c"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_MENU)
 
 func _on_back_pressed() -> void:

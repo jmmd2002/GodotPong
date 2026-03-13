@@ -20,7 +20,7 @@ import matplotlib
 matplotlib.use("TkAgg")   # must be set before importing pyplot
 import matplotlib.pyplot as plt
 
-from stats_logger import QLearningStatsLogger, PolicyGradientStatsLogger, PolicyGradientDNNStatsLogger
+from stats_logger import QLearningStatsLogger, PolicyGradientStatsLogger, PolicyGradientDNNStatsLogger, A2CStatsLogger
 
 
 class Plotter(ABC):
@@ -495,6 +495,199 @@ class PolicyGradientDNNLivePlotter(Plotter):
                             color=colors[i % len(colors)], label=label)
         ax_weights_r.set_ylabel("Grad Norm")
         ax_weights_r.plot(steps, gnorm, color="tab:red", label="grad norm", linewidth=0.8)
+
+        handles_l, labels_l = ax_weights.get_legend_handles_labels()
+        handles_r, labels_r = ax_weights_r.get_legend_handles_labels()
+        ax_weights.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+
+        fig.tight_layout(pad=3.0)
+        fig.canvas.draw_idle()
+
+
+class A2CLivePlotter(Plotter):
+    """
+    Live plot window for the Advantage Actor-Critic (A2C) agent.
+
+    Four subplots:
+        1. Avg reward (pooled, window=N episodes) over steps
+        2. Actor loss (left axis) + Critic loss (right twin axis) over steps
+        3. Policy entropy (left axis) + Mean |advantage| (right twin axis) over steps
+        4. Per-layer actor mean |W| (left axis) + Actor & critic grad norms
+           (right twin axis) over steps
+
+    Args:
+        logger:           An A2CStatsLogger instance to read from.
+        refresh_interval: Seconds between plot refreshes. Default: 5.0
+        reward_window:    Episode window size used in the avg reward title label.
+    """
+
+    def __init__(self, logger: A2CStatsLogger,
+                 refresh_interval: float = 5.0, reward_window: int = 20) -> None:
+        super().__init__(refresh_interval=refresh_interval)
+        self._logger = logger
+        self._reward_window = reward_window
+        self._thread: threading.Thread | None = None
+
+    def start(self, shutdown_event: threading.Event) -> None:
+        """Start the background plotting thread."""
+        self._thread = threading.Thread(
+            target=self._run,
+            args=(shutdown_event,),
+            daemon=True,
+            name="a2c-live-plotter",
+        )
+        self._thread.start()
+
+    def _run(self, shutdown_event: threading.Event) -> None:
+        plt.ion()
+        fig, axes = plt.subplots(2, 2, figsize=(12, 7))
+        fig.suptitle("A2C Training Progress", fontsize=13)
+        fig.tight_layout(pad=3.0)
+
+        ax_reward, ax_loss, ax_entropy, ax_weights = axes.flatten()
+
+        ax_reward.set_title("Avg Reward (pooled)")
+        ax_reward.set_xlabel("Step")
+        ax_reward.set_ylabel("Reward")
+
+        ax_loss.set_title("Actor Loss / Critic Loss")
+        ax_loss.set_xlabel("Step")
+        ax_loss.set_ylabel("Actor Loss")
+        ax_loss_r = ax_loss.twinx()
+        ax_loss_r.set_ylabel("Critic Loss")
+
+        ax_entropy.set_title("Entropy / Mean |Advantage|")
+        ax_entropy.set_xlabel("Step")
+        ax_entropy.set_ylabel("Entropy")
+        ax_entropy_r = ax_entropy.twinx()
+        ax_entropy_r.set_ylabel("Mean |Advantage|")
+
+        ax_weights.set_title("Per-Layer Actor |w| / Grad Norms")
+        ax_weights.set_xlabel("Step")
+        ax_weights.set_ylabel("|w|")
+        ax_weights_r = ax_weights.twinx()
+        ax_weights_r.set_ylabel("Grad Norm")
+
+        plt.show(block=False)
+
+        while not shutdown_event.is_set():
+            try:
+                self._redraw(
+                    fig,
+                    ax_reward,
+                    ax_loss,    ax_loss_r,
+                    ax_entropy, ax_entropy_r,
+                    ax_weights, ax_weights_r,
+                )
+            except Exception as e:
+                print(f"[A2CLivePlotter] Draw error: {e}")
+
+            for _ in range(int(self._refresh_interval / 0.5)):
+                if shutdown_event.is_set():
+                    break
+                plt.pause(0.5)
+
+        plt.close(fig)
+
+    def _redraw(
+        self,
+        fig:          plt.Figure,
+        ax_reward:    plt.Axes,
+        ax_loss:      plt.Axes,
+        ax_loss_r:    plt.Axes,
+        ax_entropy:   plt.Axes,
+        ax_entropy_r: plt.Axes,
+        ax_weights:   plt.Axes,
+        ax_weights_r: plt.Axes,
+    ) -> None:
+        """Pull latest data from the logger and redraw all subplots."""
+        with self._logger._lock:
+            snapshot = list(self._logger._buffer)
+
+        if len(snapshot) < 2:
+            return
+
+        by_worker: dict[int, list[dict]] = {}
+        for r in snapshot:
+            by_worker.setdefault(r["worker_id"], []).append(r)
+
+        w0_rows = by_worker.get(0, [])
+        if len(w0_rows) < 2:
+            return
+
+        steps = [r["step"] for r in w0_rows]
+
+        # --- 1. Avg reward ---
+        ax_reward.cla()
+        ax_reward.set_title(f"Avg Reward (pooled, window={self._reward_window} eps)")
+        ax_reward.set_xlabel("Step")
+        ax_reward.set_ylabel("Reward")
+        ax_reward.plot(steps, [r["avg_reward"] for r in w0_rows], color="tab:blue")
+
+        # --- 2. Actor loss (left) + Critic loss (right) ---
+        # Critic loss is typically much larger early in training (V(s) is far
+        # from G_t), so twin axes let both signals remain visible.
+        ax_loss.cla()
+        ax_loss_r.cla()
+        ax_loss.set_title(f"Avg Actor Loss / Avg Critic Loss (window={self._reward_window})")
+        ax_loss.set_xlabel("Step")
+        ax_loss.set_ylabel("Actor Loss")
+        ax_loss.plot(
+            steps, [r.get("avg_actor_loss", 0.0) for r in w0_rows],
+            color="tab:red", label="actor loss",
+        )
+        ax_loss_r.set_ylabel("Critic Loss")
+        ax_loss_r.plot(
+            steps, [r.get("avg_critic_loss", 0.0) for r in w0_rows],
+            color="tab:purple", linewidth=0.8, label="critic loss",
+        )
+        handles_l, labels_l = ax_loss.get_legend_handles_labels()
+        handles_r, labels_r = ax_loss_r.get_legend_handles_labels()
+        ax_loss.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+
+        # --- 3. Entropy (left) + Mean |advantage| (right) ---
+        # A shrinking mean |A_t| alongside falling entropy confirms V(s) is
+        # converging and the policy is specialising correctly.
+        ax_entropy.cla()
+        ax_entropy_r.cla()
+        ax_entropy.set_title(f"Avg Entropy / Mean |Advantage| (window={self._reward_window})")
+        ax_entropy.set_xlabel("Step")
+        ax_entropy.set_ylabel("Entropy")
+        ax_entropy.plot(
+            steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
+            color="tab:orange", label="entropy",
+        )
+        ax_entropy_r.set_ylabel("Mean |Advantage|")
+        ax_entropy_r.plot(
+            steps, [r.get("mean_advantage", 0.0) for r in w0_rows],
+            color="tab:green", linewidth=0.8, label="mean |A|",
+        )
+        handles_l, labels_l = ax_entropy.get_legend_handles_labels()
+        handles_r, labels_r = ax_entropy_r.get_legend_handles_labels()
+        ax_entropy.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+
+        # --- 4. Per-layer actor |W| (left) + actor & critic grad norms (right) ---
+        layer_keys   = sorted(k for k in w0_rows[0] if k.startswith("avg_w_actor_"))
+        actor_gnorm  = [r.get("actor_grad_norm",  0.0) for r in w0_rows]
+        critic_gnorm = [r.get("critic_grad_norm", 0.0) for r in w0_rows]
+
+        ax_weights.cla()
+        ax_weights_r.cla()
+        ax_weights.set_title("Per-Layer Actor |w| / Grad Norms")
+        ax_weights.set_xlabel("Step")
+        ax_weights.set_ylabel("|w|")
+        colors = plt.cm.tab10.colors
+        num_layers = len(layer_keys)
+        for i, key in enumerate(layer_keys):
+            label = f"W{i} (out)" if i == num_layers - 1 else f"W{i}"
+            ax_weights.plot(
+                steps, [r.get(key, 0.0) for r in w0_rows],
+                color=colors[i % len(colors)], label=label,
+            )
+        ax_weights_r.set_ylabel("Grad Norm")
+        ax_weights_r.plot(steps, actor_gnorm,  color="tab:red",    linewidth=0.8, label="actor ‖∇‖")
+        ax_weights_r.plot(steps, critic_gnorm, color="tab:purple", linewidth=0.8,
+                          linestyle="--", label="critic ‖∇‖")
 
         handles_l, labels_l = ax_weights.get_legend_handles_labels()
         handles_r, labels_r = ax_weights_r.get_legend_handles_labels()

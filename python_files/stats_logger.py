@@ -349,3 +349,105 @@ class QLearningStatsLogger(StatsLogger):
             "exploration_rate": round(stats.get("exploration_rate", 0.0), 2),
             "updates":          stats.get("updates", 0),
         }
+
+
+class A2CStatsLogger(StatsLogger):
+    """
+    StatsLogger for the Advantage Actor-Critic (A2C) agent.
+
+    Extra columns logged per record:
+        a2c_episodes    — total episodes that triggered a gradient update
+        avg_actor_loss  — windowed mean actor loss (same window as avg_reward)
+        avg_critic_loss — windowed mean critic loss (same window as avg_reward)
+        episode_return  — sum of rewards in the last finished episode
+        episode_length  — number of steps in the last finished episode
+        mean_advantage  — mean |A_t| at the last update
+        avg_entropy     — windowed mean H(π) at zero state
+        actor_grad_norm — L2 norm of the actor gradient at last update
+        critic_grad_norm— L2 norm of the critic gradient at last update
+        actor_avg_w     — mean |weight| across all actor W matrices
+        actor_max_w     — max  |weight| across all actor W matrices
+        actor_std_w     — std of all actor weights
+        critic_avg_w    — mean |weight| across all critic W matrices
+        critic_max_w    — max  |weight| across all critic W matrices
+        critic_std_w    — std of all critic weights
+        updates         — total timesteps processed
+        avg_w_actor_N   — mean |weight| of actor layer N (one column per layer)
+    """
+
+    AGENT_NAME = "A2C"
+
+    _BASE_EXTRA_FIELDS = [
+        "a2c_episodes",
+        "avg_actor_loss",
+        "avg_critic_loss",
+        "episode_return",
+        "episode_length",
+        "mean_advantage",
+        "avg_entropy",
+        "actor_grad_norm",
+        "critic_grad_norm",
+        "actor_avg_w",
+        "actor_max_w",
+        "actor_std_w",
+        "critic_avg_w",
+        "critic_max_w",
+        "critic_std_w",
+        "updates",
+    ]
+
+    EXTRA_FIELDS: list[str] = _BASE_EXTRA_FIELDS
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.EXTRA_FIELDS = list(self._BASE_EXTRA_FIELDS)
+        self._layer_fields_added = False
+        # Second loss window — tracks critic loss separately from the base
+        # episode-loss pool (which is used for actor loss via add_episode_loss).
+        self._episode_critic_losses: list[float] = []
+
+    def add_episode_critic_loss(self, loss: float, window: int) -> None:
+        """Append a completed episode's critic loss to the shared pool (thread-safe)."""
+        with self._lock:
+            self._episode_critic_losses.append(loss)
+            if len(self._episode_critic_losses) > window:
+                self._episode_critic_losses.pop(0)
+
+    def avg_episode_critic_loss(self) -> float:
+        """Return the mean critic loss over the current pool (thread-safe)."""
+        with self._lock:
+            pool = list(self._episode_critic_losses)
+        return sum(pool) / len(pool) if pool else 0.0
+
+    def _build_extra_row(self, stats: dict) -> dict:
+        if not stats:
+            return {field: "" for field in self.EXTRA_FIELDS}
+
+        # Discover per-layer actor weight keys on first real record.
+        if not self._layer_fields_added:
+            for key in sorted(k for k in stats if k.startswith("avg_w_actor_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            self._layer_fields_added = True
+
+        row = {
+            "a2c_episodes":    stats.get("episodes", 0),
+            "avg_actor_loss":  round(self.avg_episode_loss(),        6),
+            "avg_critic_loss": round(self.avg_episode_critic_loss(), 6),
+            "episode_return":  round(stats.get("episode_return",    0.0), 6),
+            "episode_length":       stats.get("episode_length",    0),
+            "mean_advantage":  round(stats.get("mean_advantage",    0.0), 6),
+            "avg_entropy":     round(self.avg_episode_entropy(),     6),
+            "actor_grad_norm": round(stats.get("actor_grad_norm",   0.0), 6),
+            "critic_grad_norm":round(stats.get("critic_grad_norm",  0.0), 6),
+            "actor_avg_w":     round(stats.get("actor_avg_w",       0.0), 6),
+            "actor_max_w":     round(stats.get("actor_max_w",       0.0), 6),
+            "actor_std_w":     round(stats.get("actor_std_w",       0.0), 6),
+            "critic_avg_w":    round(stats.get("critic_avg_w",      0.0), 6),
+            "critic_max_w":    round(stats.get("critic_max_w",      0.0), 6),
+            "critic_std_w":    round(stats.get("critic_std_w",      0.0), 6),
+            "updates":              stats.get("updates",            0),
+        }
+        for key in (k for k in self.EXTRA_FIELDS if k.startswith("avg_w_actor_")):
+            row[key] = round(stats.get(key, 0.0), 6)
+        return row

@@ -1,0 +1,46 @@
+# Advantage Actor-Critic (A2C) Agent — Student
+#
+# The student sees BOTH paddles and the ball (full game state).
+# It is trained against the coach (vs_coach mode).
+
+# State variables (continuous, normalised to [-1, 1] by Godot)
+state:
+  - paddleA_y
+  - paddleB_y
+  - ball_x
+  - ball_y
+  - ball_vx
+  - ball_vy
+
+# Available actions
+actions:
+  - UP
+  - DOWN
+  - STAY
+
+# Learning hyperparameters
+hyperparameters:
+  alpha_actor:  0.0003
+  alpha_critic: 0.001
+  gamma:        0.99
+  actor_hidden_sizes:  [64, 64]
+  critic_hidden_sizes: [128, 64]
+  entropy_coef: 0.01
+  critic_coef:  0.5
+
+# Model persistence settings
+model:
+  path: models/a2c_student.json
+  load_on_start: true
+  save_on_exit: true
+  autosave_every_n_steps: 100
+  num_workers: 2
+
+# Logging / monitoring settings
+logs:
+  log_enabled: true
+  log_every_n_steps: 100
+  log_dir: logs
+  reward_window: 20
+  plot_enabled: false
+  plot_refresh_interval: 5.0
