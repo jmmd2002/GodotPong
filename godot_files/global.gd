@@ -8,7 +8,6 @@ const FRAME_DT: float = 1.0 / TARGET_FPS
 var is_host: bool = false
 var is_online: bool = false
 var join_ip: String = ""
-var paddle_prefix: String = ""
 var paddle_a_mode: String = "manual_a"
 var paddle_b_mode: String = "manual_b"
 # "vs_static" | "vs_homing" | "vs_coach" | "coach"

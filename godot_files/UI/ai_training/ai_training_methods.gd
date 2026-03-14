@@ -73,23 +73,19 @@ func _ready() -> void:
 func _on_q_learning_pressed() -> void:
 	# Default / existing behaviour: use Q-learning
 	Global.training_method = "qvalue"
-	Global.paddle_prefix = "Q"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_MENU)
 
 
 func _on_policy_gradient_pressed() -> void:
 	Global.training_method = "policy_gradient"
-	Global.paddle_prefix = "PolGrad"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_MENU)
 
 func _on_policy_gradient_DNN_pressed() -> void:
 	Global.training_method = "policy_gradient_dnn"
-	Global.training_prefix = "PolGradDNN"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_MENU)
 
 func _on_A2C_pressed() -> void:
 	Global.training_method = "a2c"
-	Global.paddle_prefix = "A2C"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_MENU)
 
 func _on_back_pressed() -> void:

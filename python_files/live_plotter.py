@@ -378,40 +378,19 @@ class PolicyGradientDNNLivePlotter(Plotter):
 
     def _run(self, shutdown_event: threading.Event) -> None:
         plt.ion()
-        fig, axes = plt.subplots(2, 2, figsize=(12, 7))
-        fig.suptitle("Policy Gradient DNN Training Progress", fontsize=13)
-        fig.tight_layout(pad=3.0)
+        fig, axes = plt.subplots(3, 2, figsize=(20, 15))
+        fig.suptitle("Policy Gradient DNN — Training Progress", fontsize=18, fontweight="bold")
+        fig.tight_layout(pad=4.5)
 
-        ax_reward, ax_loss, ax_return, ax_weights = axes.flatten()
-
-        ax_reward.set_title("Avg Reward (pooled)")
-        ax_reward.set_xlabel("Step")
-        ax_reward.set_ylabel("Reward")
-
-        ax_loss.set_title("Avg Policy Loss (pooled)")
-        ax_loss.set_xlabel("Step")
-        ax_loss.set_ylabel("Loss")
-
-        ax_return.set_title("Avg Entropy (pooled)")
-        ax_return.set_xlabel("Step")
-        ax_return.set_ylabel("Entropy")
-
-        ax_weights.set_title("Per-Layer |w| / Grad Norm")
-        ax_weights.set_xlabel("Step")
-        ax_weights.set_ylabel("|w|")
-        ax_weights_r = ax_weights.twinx()
-        ax_weights_r.set_ylabel("Grad Norm")
+        (ax_reward, ax_loss,
+         ax_entropy, ax_grad,
+         ax_ratio,  ax_dead) = axes.flatten()
 
         plt.show(block=False)
 
         while not shutdown_event.is_set():
             try:
-                self._redraw(
-                    fig,
-                    ax_reward, ax_loss,
-                    ax_return,
-                    ax_weights, ax_weights_r,
-                )
+                self._redraw(fig, ax_reward, ax_loss, ax_entropy, ax_grad, ax_ratio, ax_dead)
             except Exception as e:
                 print(f"[PolicyGradientDNNLivePlotter] Draw error: {e}")
 
@@ -424,23 +403,27 @@ class PolicyGradientDNNLivePlotter(Plotter):
 
     def _redraw(
         self,
-        fig:          plt.Figure,
-        ax_reward:    plt.Axes,
-        ax_loss:      plt.Axes,
-        ax_return:    plt.Axes,
-        ax_weights:   plt.Axes,
-        ax_weights_r: plt.Axes,
+        fig:        plt.Figure,
+        ax_reward:  plt.Axes,
+        ax_loss:    plt.Axes,
+        ax_entropy: plt.Axes,
+        ax_grad:    plt.Axes,
+        ax_ratio:   plt.Axes,
+        ax_dead:    plt.Axes,
     ) -> None:
-        """Pull latest data from the logger and redraw all subplots."""
+        """Pull latest data from the logger and redraw all six subplots."""
+        TITLE_FS  = 14
+        LABEL_FS  = 12
+        LEGEND_FS = 12
+        TICK_FS   = 11
+        LW        = 1.8
+
         with self._logger._lock:
             snapshot = list(self._logger._buffer)
 
         if len(snapshot) < 2:
             return
 
-        # Only worker 0 rows carry agent-internal stats (weights, grad_norm,
-        # entropy). avg_reward is computed from the shared episode pool so it
-        # already reflects all workers — no per-worker splitting needed.
         by_worker: dict[int, list[dict]] = {}
         for r in snapshot:
             by_worker.setdefault(r["worker_id"], []).append(r)
@@ -449,58 +432,111 @@ class PolicyGradientDNNLivePlotter(Plotter):
         if len(w0_rows) < 2:
             return
 
-        steps = [r["step"] for r in w0_rows]
-
-        # --- 1. Avg reward ---
-        ax_reward.cla()
-        ax_reward.set_title(f"Avg Reward (pooled, window={self._reward_window} eps)")
-        ax_reward.set_xlabel("Step")
-        ax_reward.set_ylabel("Reward")
-        ax_reward.plot(steps, [r["avg_reward"] for r in w0_rows], color="tab:blue")
-
-        # --- 2. Policy loss ---
-        ax_loss.cla()
-        ax_loss.set_title(f"Avg Policy Loss (pooled, window={self._reward_window} eps)")
-        ax_loss.set_xlabel("Step")
-        ax_loss.set_ylabel("Loss")
-        ax_loss.plot(steps, [r.get("avg_loss", 0.0) for r in w0_rows], color="tab:red")
-
-        # --- 3. Entropy ---
-        ax_return.cla()
-        ax_return.set_title(f"Avg Entropy (pooled, window={self._reward_window} eps)")
-        ax_return.set_xlabel("Step")
-        ax_return.set_ylabel("Entropy")
-        ax_return.plot(
-            steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
-            color="tab:orange", label="Entropy",
-        )
-
-        # --- 4. Per-layer mean |W| + grad norm (twin axis) ---
-        # One line per weight matrix (avg_w_0 = input→hidden1, …, avg_w_N = hidden→output).
-        # grad_norm (right axis) spans all layers: a sudden spike indicates
-        # gradient explosion; a value staying at 0 suggests vanishing gradients.
-        layer_keys = sorted(k for k in w0_rows[0] if k.startswith("avg_w_"))
-        gnorm = [r.get("grad_norm", 0.0) for r in w0_rows]
-
-        ax_weights.cla()
-        ax_weights_r.cla()
-        ax_weights.set_title("Per-Layer |w| / Grad Norm")
-        ax_weights.set_xlabel("Step")
-        ax_weights.set_ylabel("|w|")
+        steps  = [r["step"] for r in w0_rows]
         colors = plt.cm.tab10.colors
-        num_layers = len(layer_keys)
-        for i, key in enumerate(layer_keys):
-            label = f"W{i} (out)" if i == num_layers - 1 else f"W{i}"
-            ax_weights.plot(steps, [r.get(key, 0.0) for r in w0_rows],
-                            color=colors[i % len(colors)], label=label)
-        ax_weights_r.set_ylabel("Grad Norm")
-        ax_weights_r.plot(steps, gnorm, color="tab:red", label="grad norm", linewidth=0.8)
 
-        handles_l, labels_l = ax_weights.get_legend_handles_labels()
-        handles_r, labels_r = ax_weights_r.get_legend_handles_labels()
-        ax_weights.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+        def _style(ax: plt.Axes, title: str, xlabel: str, ylabel: str) -> None:
+            ax.set_title(title, fontsize=TITLE_FS, fontweight="bold")
+            ax.set_xlabel(xlabel, fontsize=LABEL_FS)
+            ax.set_ylabel(ylabel, fontsize=LABEL_FS)
+            ax.tick_params(labelsize=TICK_FS)
 
-        fig.tight_layout(pad=3.0)
+        # ----------------------------------------------------------------
+        # 1. Avg reward
+        # ----------------------------------------------------------------
+        ax_reward.cla()
+        _style(ax_reward,
+               f"Avg Reward  (window = {self._reward_window} eps)",
+               "Step", "Reward")
+        ax_reward.plot(steps, [r["avg_reward"] for r in w0_rows],
+                       color="tab:blue", linewidth=LW)
+
+        # ----------------------------------------------------------------
+        # 2. Policy loss (windowed avg)
+        # ----------------------------------------------------------------
+        ax_loss.cla()
+        _style(ax_loss,
+               f"Avg Policy Loss  (window = {self._reward_window} eps)",
+               "Step", "Loss")
+        ax_loss.plot(steps, [r.get("avg_loss", 0.0) for r in w0_rows],
+                     color="tab:red", linewidth=LW)
+
+        # ----------------------------------------------------------------
+        # 3. Entropy (left) + KL divergence (right twin)
+        #    Entropy falling = policy sharpening (good).
+        #    KL ≈ 0 every episode = updates too small to matter.
+        # ----------------------------------------------------------------
+        ax_entropy.cla()
+        ax_kl = ax_entropy.twinx()
+        ax_kl.cla()
+        _style(ax_entropy,
+               f"Entropy  +  KL Divergence (per episode)",
+               "Step", "Entropy  H(π)")
+        ax_entropy.plot(steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
+                        color="tab:orange", linewidth=LW, label="Entropy H(π)")
+        ax_kl.set_ylabel("KL divergence", fontsize=LABEL_FS)
+        ax_kl.tick_params(labelsize=TICK_FS)
+        ax_kl.plot(steps, [r.get("kl_div", 0.0) for r in w0_rows],
+                   color="tab:purple", linewidth=LW * 0.85, linestyle="--", label="KL div")
+        h_l, lb_l = ax_entropy.get_legend_handles_labels()
+        h_r, lb_r = ax_kl.get_legend_handles_labels()
+        ax_entropy.legend(h_l + h_r, lb_l + lb_r, fontsize=LEGEND_FS, loc="upper right")
+
+        # ----------------------------------------------------------------
+        # 4. Per-layer gradient norms  ‖∇W_i‖
+        #    Vanishing: early-layer norms near zero while last layer is large.
+        #    Exploding: any layer norm spikes.
+        # ----------------------------------------------------------------
+        grad_keys = sorted(k for k in w0_rows[0] if k.startswith("grad_norm_"))
+        ax_grad.cla()
+        _style(ax_grad, "Per-Layer Gradient Norms  ‖∇W_i‖", "Step", "‖∇W_i‖")
+        num_gl = len(grad_keys)
+        for i, key in enumerate(grad_keys):
+            suffix = key.replace("grad_norm_", "")
+            label  = f"W{suffix} (output)" if i == num_gl - 1 else f"W{suffix}"
+            ax_grad.plot(steps, [r.get(key, 0.0) for r in w0_rows],
+                         color=colors[i % len(colors)], linewidth=LW, label=label)
+        if grad_keys:
+            ax_grad.legend(fontsize=LEGEND_FS)
+
+        # ----------------------------------------------------------------
+        # 5. Update ratios  α‖∇W_i‖ / ‖W_i‖  (Karpathy rule-of-thumb ≈ 1e-3)
+        #    Too low (< 1e-4): weights barely moving — learning is stalled.
+        #    Too high (> 1e-2): updates too large — risk of instability.
+        # ----------------------------------------------------------------
+        ratio_keys = sorted(k for k in w0_rows[0] if k.startswith("update_ratio_"))
+        ax_ratio.cla()
+        _style(ax_ratio,
+               "Update Ratios  α‖∇W_i‖ / ‖W_i‖   (healthy ≈ 1e-3)",
+               "Step", "α‖∇W‖ / ‖W‖")
+        num_rl = len(ratio_keys)
+        for i, key in enumerate(ratio_keys):
+            suffix = key.replace("update_ratio_", "")
+            label  = f"W{suffix} (output)" if i == num_rl - 1 else f"W{suffix}"
+            ax_ratio.plot(steps, [r.get(key, 0.0) for r in w0_rows],
+                          color=colors[i % len(colors)], linewidth=LW, label=label)
+        if ratio_keys:
+            ax_ratio.axhline(y=1e-3, color="dimgray", linestyle=":", linewidth=1.2,
+                             label="target  1e-3")
+            ax_ratio.legend(fontsize=LEGEND_FS)
+
+        # ----------------------------------------------------------------
+        # 6. Dead ReLU %
+        #    > 30 %: significant capacity loss — consider lower learning rate
+        #            or weight re-initialisation.
+        # ----------------------------------------------------------------
+        ax_dead.cla()
+        _style(ax_dead,
+               "Dead ReLU %  (random 100-sample batch, hidden layers)",
+               "Step", "Dead activations %")
+        ax_dead.plot(steps, [r.get("dead_relu_pct", 0.0) for r in w0_rows],
+                     color="tab:brown", linewidth=LW, label="Dead ReLU %")
+        ax_dead.set_ylim(0, 100)
+        ax_dead.axhline(y=30, color="tab:red", linestyle="--", linewidth=1.2,
+                        label="30 % warning")
+        ax_dead.legend(fontsize=LEGEND_FS)
+
+        fig.tight_layout(pad=4.5)
         fig.canvas.draw_idle()
 
 

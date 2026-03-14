@@ -261,6 +261,8 @@ class PolicyGradientDNNStatsLogger(StatsLogger):
         "std_w",
         "avg_entropy",
         "grad_norm",
+        "kl_div",
+        "dead_relu_pct",
         "updates",
     ]
 
@@ -288,6 +290,12 @@ class PolicyGradientDNNStatsLogger(StatsLogger):
             for key in sorted(k for k in stats if k.startswith("avg_w_")):
                 if key not in self.EXTRA_FIELDS:
                     self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("grad_norm_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("update_ratio_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
             self._layer_fields_added = True
 
         row = {
@@ -300,10 +308,13 @@ class PolicyGradientDNNStatsLogger(StatsLogger):
             "std_w":          round(stats.get("std_w", 0.0), 6),
             "avg_entropy":    round(self.avg_episode_entropy(), 6),
             "grad_norm":      round(stats.get("grad_norm", 0.0), 6),
+            "kl_div":         round(stats.get("kl_div", 0.0), 8),
+            "dead_relu_pct":  round(stats.get("dead_relu_pct", 0.0), 4),
             "updates":        stats.get("updates", 0),
         }
-        for key in (k for k in self.EXTRA_FIELDS if k.startswith("avg_w_")):
-            row[key] = round(stats.get(key, 0.0), 6)
+        for prefix in ("avg_w_", "grad_norm_", "update_ratio_"):
+            for key in (k for k in self.EXTRA_FIELDS if k.startswith(prefix)):
+                row[key] = round(stats.get(key, 0.0), 8 if prefix == "update_ratio_" else 6)
         return row
 
 

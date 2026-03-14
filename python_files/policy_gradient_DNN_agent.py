@@ -185,6 +185,10 @@ class PolicyGradientDNNAgent(RLAgent):
         self._last_episode_length = 0     # number of steps in the last finished episode
         self._last_grad_norm      = 0.0   # L2 norm of the full gradient at last update
         self._last_entropy        = 0.0   # H(π) at zero state, cached after each gradient step
+        self._last_layer_grad_norms:    list[float] = []   # per-layer ‖∇W_i‖
+        self._last_layer_update_ratios: list[float] = []   # per-layer α‖∇W_i‖/‖W_i‖
+        self._last_kl:                  float       = 0.0  # KL(π_before ‖ π_after) at zero state
+        self._last_dead_relu:           float       = 0.0  # % of hidden activations = 0
 
     # ------------------------------------------------------------------
     # Parameter initialisation
@@ -784,6 +788,20 @@ class PolicyGradientDNNAgent(RLAgent):
             ))
         )
 
+        # Per-layer gradient norms and update ratios (before lock — params unchanged).
+        num_layers = len(self.params) // 2
+        layer_grad_norms    = []
+        layer_update_ratios = []
+        for _i in range(num_layers):
+            g_norm_i = float(jnp.sqrt(jnp.sum(grads[f"W{_i}"] ** 2)))
+            w_norm_i = float(jnp.sqrt(jnp.sum(self.params[f"W{_i}"] ** 2)))
+            layer_grad_norms.append(g_norm_i)
+            layer_update_ratios.append(self.alpha * g_norm_i / (w_norm_i + 1e-8))
+
+        # Policy distribution before the update — used to compute KL divergence.
+        s_zero    = jnp.zeros(self.state_dim)
+        pi_before = np.array(self._forward_jit(self.params, s_zero))
+
         # Apply the gradient update and record stats under the lock so
         # save() (called from a separate thread) never sees a half-written state.
         with self._lock:
@@ -797,12 +815,36 @@ class PolicyGradientDNNAgent(RLAgent):
             self._last_episode_return  = float(sum(rewards))
             self._last_episode_length  = len(rewards)
             self._last_grad_norm       = grad_norm
-            # Cache entropy at the new params — JIT-compiled, fast after warmup.
-            # Doing it here avoids recomputing a forward pass in get_stats().
-            s_zero = jnp.zeros(self.state_dim)
-            pi_zero = np.array(self._forward_jit(self.params, s_zero))
+
+            # Per-layer metrics.
+            self._last_layer_grad_norms    = layer_grad_norms
+            self._last_layer_update_ratios = layer_update_ratios
+
+            # KL divergence: how much did this update shift the policy at the zero state?
+            pi_after = np.array(self._forward_jit(self.params, s_zero))
+            self._last_kl = float(
+                np.sum(pi_before * np.log((pi_before + 1e-8) / (pi_after + 1e-8)))
+            )
+
+            # Dead ReLU: fraction of hidden activations that are 0 on a random batch.
+            # Uses plain numpy — no JAX tracing overhead, fast enough per episode.
+            _x = np.random.uniform(-1.0, 1.0, (100, self.state_dim)).astype(np.float32)
+            _total_acts = 0
+            _dead_acts  = 0
+            for _i in range(len(self.hidden_sizes)):
+                _x = np.maximum(
+                    0.0,
+                    _x @ np.array(self.params[f"W{_i}"]).T + np.array(self.params[f"b{_i}"]),
+                )
+                _dead_acts  += int(np.sum(_x == 0.0))
+                _total_acts += int(_x.size)
+            self._last_dead_relu = (
+                100.0 * _dead_acts / _total_acts if _total_acts > 0 else 0.0
+            )
+
+            # Cache entropy — reuse pi_after computed above.
             self._last_entropy = float(
-                -np.sum(pi_zero * np.log(np.clip(pi_zero, 1e-8, 1.0)))
+                -np.sum(pi_after * np.log(np.clip(pi_after, 1e-8, 1.0)))
             )
 
     # ------------------------------------------------------------------
@@ -1002,14 +1044,18 @@ class PolicyGradientDNNAgent(RLAgent):
             grad_norm      — L2 norm of full gradient at last update
         """
         with self._lock:
-            params_snap           = {k: np.array(v) for k, v in self.params.items()}
-            episodes_completed    = self._episodes_completed
-            updates_count         = self._updates_count
-            last_loss             = self._last_loss
-            last_episode_return   = self._last_episode_return
-            last_episode_length   = self._last_episode_length
-            last_grad_norm        = self._last_grad_norm
-            last_entropy          = self._last_entropy
+            params_snap              = {k: np.array(v) for k, v in self.params.items()}
+            episodes_completed       = self._episodes_completed
+            updates_count            = self._updates_count
+            last_loss                = self._last_loss
+            last_episode_return      = self._last_episode_return
+            last_episode_length      = self._last_episode_length
+            last_grad_norm           = self._last_grad_norm
+            last_entropy             = self._last_entropy
+            last_layer_grad_norms    = list(self._last_layer_grad_norms)
+            last_layer_update_ratios = list(self._last_layer_update_ratios)
+            last_kl                  = self._last_kl
+            last_dead_relu           = self._last_dead_relu
 
         # Aggregate weight stats across all W matrices (skip biases)
         layer_keys = sorted(k for k in params_snap if k.startswith("W"))
@@ -1023,6 +1069,14 @@ class PolicyGradientDNNAgent(RLAgent):
             f"avg_w_{i}": round(float(np.abs(params_snap[k]).mean()), 6)
             for i, k in enumerate(layer_keys)
         }
+        per_layer_grad_norms = {
+            f"grad_norm_{i}": round(v, 6)
+            for i, v in enumerate(last_layer_grad_norms)
+        }
+        per_layer_update_ratios = {
+            f"update_ratio_{i}": round(v, 8)
+            for i, v in enumerate(last_layer_update_ratios)
+        }
 
         return {
             "episodes":        episodes_completed,
@@ -1035,7 +1089,11 @@ class PolicyGradientDNNAgent(RLAgent):
             "std_w":           round(std_w, 6),
             "avg_entropy":     round(last_entropy, 6),
             "grad_norm":       round(last_grad_norm, 6),
+            "kl_div":          round(last_kl, 8),
+            "dead_relu_pct":   round(last_dead_relu, 4),
             **per_layer_avg_w,
+            **per_layer_grad_norms,
+            **per_layer_update_ratios,
         }
 
     # ------------------------------------------------------------------

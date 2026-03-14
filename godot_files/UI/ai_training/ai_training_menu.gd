@@ -75,7 +75,7 @@ func _on_vs_coach_pressed() -> void:
 	# PaddleA trains against the pre-trained coach model
 	Global.training_mode = "vs_coach"
 	Global.paddle_a_mode = "ai_training"
-	Global.paddle_b_mode = Global.paddle_prefix + "coach"
+	Global.paddle_b_mode = "coach"
 	get_tree().change_scene_to_file(Paths.AI_TRAINING_RUN)
 
 
