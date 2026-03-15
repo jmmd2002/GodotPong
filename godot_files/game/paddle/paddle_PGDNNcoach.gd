@@ -12,9 +12,6 @@ var hidden_sizes: Array = []   # e.g. [128, 64]
 # layers[0..n-2] are ReLU hidden layers; layers[n-1] is the linear output layer.
 var layers: Array = []
 
-var _opponent: Node2D = null
-
-
 func _ready() -> void:
 	super._ready()
 	_load_policy()
@@ -49,18 +46,6 @@ func _load_policy() -> void:
 
 	print("PGDNNStudent: loaded MLP  state_vars=%s  actions=%s  hidden_sizes=%s" \
 		% [state_vars, actions, hidden_sizes])
-
-
-# Return the other paddle in the scene (lazy-cached).
-func _get_opponent() -> Node2D:
-	if _opponent != null and not _opponent.is_queued_for_deletion():
-		return _opponent
-	for p: Node in get_tree().get_nodes_in_group("paddle"):
-		if p != self:
-			_opponent = p
-			return _opponent
-	return null
-
 
 # Compute relu(x) element-wise on a PackedFloat64Array.
 func _relu(x: PackedFloat64Array) -> PackedFloat64Array:
@@ -103,15 +88,8 @@ func get_direction() -> int:
 	# Mirror ball_x and ball_vx when playing on the right.
 	var on_right_side: bool = position.x > max_x / 2.0
 	var mirror: float       = -1.0 if on_right_side else 1.0
-
-	var opponent: Node2D       = _get_opponent()
-	var opponent_norm_y: float = 0.0
-	if opponent != null:
-		opponent_norm_y = (opponent.position.y - max_y / 2.0) / (max_y / 2.0)
-
 	var norm_values: Dictionary = {
-		"paddleA_y": (position.y           - max_y / 2.0) / (max_y / 2.0),
-		"paddleB_y": opponent_norm_y,
+		"paddle_y": (position.y           - max_y / 2.0) / (max_y / 2.0),
 		"ball_x":    mirror * (ball.position.x - max_x / 2.0) / (max_x / 2.0),
 		"ball_y":    (ball.position.y       - max_y / 2.0) / (max_y / 2.0),
 		"ball_vx":   mirror * ball.velocity.x / Global.MAX_SPEED,
