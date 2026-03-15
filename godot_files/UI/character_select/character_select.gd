@@ -13,8 +13,14 @@ var CHARACTERS: Array = [
 	{"name": "Norman",   "key_a": "manual_a", "key_b": "manual_b", "texture": Sprites.SPR_PADDLE},
 	{"name": "Quim",   "key_a": "Qcoach",    "key_b": "Qcoach",    "texture": Sprites.SPR_PADDLE_QCOACH},
 	{"name": "Quenito", "key_a": "Qstudent",  "key_b": "Qstudent",  "texture": Sprites.SPR_PADDLE_QSTUDENT},
-	{"name": "Paulo", "key_a": "PolGradcoach", "key_b": "PolGradcoach", "texture": Sprites.SPR_PADDLE_QCOACH},
-	{"name": "Pedrinho", "key_a": "PolGradstudent", "key_b": "PolGradstudent", "texture": Sprites.SPR_PADDLE_QSTUDENT}
+	{"name": "Gustavo", "key_a": "PolGradcoach", "key_b": "PolGradcoach", "texture": Sprites.SPR_PADDLE_POLGRADCOACH},
+	{"name": "Gui", "key_a": "PolGradstudent", "key_b": "PolGradstudent", "texture": Sprites.SPR_PADDLE_POLGRADSTUDENT},
+	{"name": "Domingos", "key_a": "PolGradDNNcoach", "key_b": "PolGradDNNcoach", "texture": Sprites.SPR_PADDLE_POLGRADDNNCOACH},
+	{"name": "Dino", "key_a": "PolGradDNNstudent", "key_b": "PolGradDNNstudent", "texture": Sprites.SPR_PADDLE_POLGRADDNNSTUDENT},
+	{"name": "Aurélio", "key_a": "A2Ccoach", "key_b": "A2Ccoach", "texture": Sprites.SPR_PADDLE_A2CCOACH},
+	{"name": "António", "key_a": "A2Cstudent", "key_b": "A2Cstudent", "texture": Sprites.SPR_PADDLE_A2CSTUDENT},
+	{"name": "Paulo", "key_a": "PPOcoach", "key_b": "PPOcoach", "texture": Sprites.SPR_PADDLE_PPOCOACH},
+	{"name": "Pedrinho", "key_a": "PPOstudent", "key_b": "PPOstudent", "texture": Sprites.SPR_PADDLE_PPOSTUDENT}
 ]
 
 var selected_a: int = 0

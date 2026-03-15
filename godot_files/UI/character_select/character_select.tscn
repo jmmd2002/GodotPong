@@ -1,14 +1,16 @@
-[gd_scene format=3 uid="uid://char_sel_scene01"]
+[gd_scene format=3 uid="uid://cjuydjbel0bic"]
 
-[ext_resource type="Script" path="res://UI/character_select/character_select.gd" id="1_csscript"]
+[ext_resource type="Script" uid="uid://b5q5xwm4c1ikf" path="res://UI/character_select/character_select.gd" id="1_csscript"]
 [ext_resource type="FontFile" uid="uid://dnvrai1uy21tu" path="res://assets/fonts/joystix monospace.otf" id="2_csfont"]
 
-[node name="CharacterSelect" type="Control"]
+[node name="CharacterSelect" type="Control" unique_id=699122344]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_csscript")
 
-[node name="Title" type="Label" parent="."]
+[node name="Title" type="Label" parent="." unique_id=1381316522]
 layout_mode = 0
 offset_left = 440.0
 offset_top = 40.0
@@ -16,10 +18,10 @@ offset_right = 840.0
 offset_bottom = 100.0
 theme_override_fonts/font = ExtResource("2_csfont")
 theme_override_font_sizes/font_size = 36
-horizontal_alignment = 1
 text = "SELECT CHARACTER"
+horizontal_alignment = 1
 
-[node name="BackButton" type="Button" parent="."]
+[node name="BackButton" type="Button" parent="." unique_id=1009498731]
 layout_mode = 0
 offset_left = 20.0
 offset_top = 664.0
@@ -29,7 +31,7 @@ theme_override_fonts/font = ExtResource("2_csfont")
 theme_override_font_sizes/font_size = 14
 text = "Back"
 
-[node name="PlayButton" type="Button" parent="."]
+[node name="PlayButton" type="Button" parent="." unique_id=70211617]
 layout_mode = 0
 offset_left = 570.0
 offset_top = 656.0

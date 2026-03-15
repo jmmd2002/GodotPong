@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://c4k5nmtc6vxu5"]
+
+[ext_resource type="Script" uid="uid://l8ckjk6hc1bw" path="res://game/paddle/paddle_PPOstudent.gd" id="1_yj3r3"]
+[ext_resource type="Texture2D" uid="uid://c7q2yegwgr6o7" path="res://assets/sprites/spr_paddle_sky.png" id="2_hxqwt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0001"]
+size = Vector2(20, 100)
+
+[node name="Paddle" type="Node2D" unique_id=830241763]
+script = ExtResource("1_yj3r3")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=541293817]
+texture = ExtResource("2_hxqwt")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=712845039]
+shape = SubResource("RectangleShape2D_0001")

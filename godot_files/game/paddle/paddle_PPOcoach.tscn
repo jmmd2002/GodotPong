@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://dqfibmvql8r7u"]
+
+[ext_resource type="Script" uid="uid://c5d6oyw0svw6v" path="res://game/paddle/paddle_PPOcoach.gd" id="1_0m3mu"]
+[ext_resource type="Texture2D" uid="uid://bwgwc0vlvlv07" path="res://assets/sprites/spr_paddle_water.png" id="2_yxbow"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0001"]
+size = Vector2(20, 100)
+
+[node name="Paddle" type="Node2D" unique_id=830241763]
+script = ExtResource("1_0m3mu")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=541293817]
+texture = ExtResource("2_yxbow")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=712845039]
+shape = SubResource("RectangleShape2D_0001")
