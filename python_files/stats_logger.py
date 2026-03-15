@@ -367,23 +367,27 @@ class A2CStatsLogger(StatsLogger):
     StatsLogger for the Advantage Actor-Critic (A2C) agent.
 
     Extra columns logged per record:
-        a2c_episodes    — total episodes that triggered a gradient update
-        avg_actor_loss  — windowed mean actor loss (same window as avg_reward)
-        avg_critic_loss — windowed mean critic loss (same window as avg_reward)
-        episode_return  — sum of rewards in the last finished episode
-        episode_length  — number of steps in the last finished episode
-        mean_advantage  — mean |A_t| at the last update
-        avg_entropy     — windowed mean H(π) at zero state
-        actor_grad_norm — L2 norm of the actor gradient at last update
-        critic_grad_norm— L2 norm of the critic gradient at last update
-        actor_avg_w     — mean |weight| across all actor W matrices
-        actor_max_w     — max  |weight| across all actor W matrices
-        actor_std_w     — std of all actor weights
-        critic_avg_w    — mean |weight| across all critic W matrices
-        critic_max_w    — max  |weight| across all critic W matrices
-        critic_std_w    — std of all critic weights
-        updates         — total timesteps processed
-        avg_w_actor_N   — mean |weight| of actor layer N (one column per layer)
+        a2c_episodes         — total episodes that triggered a gradient update
+        avg_actor_loss       — windowed mean actor loss (same window as avg_reward)
+        avg_critic_loss      — windowed mean critic loss (same window as avg_reward)
+        episode_return       — sum of rewards in the last finished episode
+        episode_length       — number of steps in the last finished episode
+        mean_advantage       — mean |A_t| at the last update
+        avg_entropy          — windowed mean H(π) at zero state
+        actor_grad_norm      — L2 norm of the actor gradient at last update
+        critic_grad_norm     — L2 norm of the critic gradient at last update
+        kl_div               — KL divergence of actor policy before vs after last update
+        dead_relu_pct        — % of dead ReLU activations in actor hidden layers
+        actor_avg_w          — mean |weight| across all actor W matrices
+        actor_max_w          — max  |weight| across all actor W matrices
+        actor_std_w          — std of all actor weights
+        critic_avg_w         — mean |weight| across all critic W matrices
+        critic_max_w         — max  |weight| across all critic W matrices
+        critic_std_w         — std of all critic weights
+        updates              — total timesteps processed
+        avg_w_actor_N        — mean |weight| of actor layer N (one column per layer)
+        grad_norm_actor_N    — per-layer L2 gradient norm of actor layer N
+        update_ratio_actor_N — α‖∇W_i‖/‖W_i‖ of actor layer N (healthy ≈ 1e-3)
     """
 
     AGENT_NAME = "A2C"
@@ -398,6 +402,8 @@ class A2CStatsLogger(StatsLogger):
         "avg_entropy",
         "actor_grad_norm",
         "critic_grad_norm",
+        "kl_div",
+        "dead_relu_pct",
         "actor_avg_w",
         "actor_max_w",
         "actor_std_w",
@@ -434,9 +440,18 @@ class A2CStatsLogger(StatsLogger):
         if not stats:
             return {field: "" for field in self.EXTRA_FIELDS}
 
-        # Discover per-layer actor weight keys on first real record.
+        # Discover per-layer keys on the first real record.
         if not self._layer_fields_added:
             for key in sorted(k for k in stats if k.startswith("avg_w_actor_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("avg_w_critic_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("grad_norm_actor_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("update_ratio_actor_")):
                 if key not in self.EXTRA_FIELDS:
                     self.EXTRA_FIELDS.append(key)
             self._layer_fields_added = True
@@ -451,6 +466,8 @@ class A2CStatsLogger(StatsLogger):
             "avg_entropy":     round(self.avg_episode_entropy(),     6),
             "actor_grad_norm": round(stats.get("actor_grad_norm",   0.0), 6),
             "critic_grad_norm":round(stats.get("critic_grad_norm",  0.0), 6),
+            "kl_div":          round(stats.get("kl_div",            0.0), 8),
+            "dead_relu_pct":   round(stats.get("dead_relu_pct",     0.0), 4),
             "actor_avg_w":     round(stats.get("actor_avg_w",       0.0), 6),
             "actor_max_w":     round(stats.get("actor_max_w",       0.0), 6),
             "actor_std_w":     round(stats.get("actor_std_w",       0.0), 6),
@@ -459,8 +476,9 @@ class A2CStatsLogger(StatsLogger):
             "critic_std_w":    round(stats.get("critic_std_w",      0.0), 6),
             "updates":              stats.get("updates",            0),
         }
-        for key in (k for k in self.EXTRA_FIELDS if k.startswith("avg_w_actor_")):
-            row[key] = round(stats.get(key, 0.0), 6)
+        for prefix in ("avg_w_actor_", "avg_w_critic_", "grad_norm_actor_", "update_ratio_actor_"):
+            for key in (k for k in self.EXTRA_FIELDS if k.startswith(prefix)):
+                row[key] = round(stats.get(key, 0.0), 8 if prefix == "update_ratio_actor_" else 6)
         return row
 
 
@@ -559,9 +577,12 @@ class PPOStatsLogger(StatsLogger):
         if not stats:
             return {field: "" for field in self.EXTRA_FIELDS}
 
-        # Discover per-layer actor weight keys on first real record.
+        # Discover per-layer actor and critic weight keys on first real record.
         if not self._layer_fields_added:
             for key in sorted(k for k in stats if k.startswith("avg_w_actor_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("avg_w_critic_")):
                 if key not in self.EXTRA_FIELDS:
                     self.EXTRA_FIELDS.append(key)
             self._layer_fields_added = True
@@ -586,6 +607,6 @@ class PPOStatsLogger(StatsLogger):
             "critic_std_w":    round(stats.get("critic_std_w",     0.0), 6),
             "updates":              stats.get("updates",           0),
         }
-        for key in (k for k in self.EXTRA_FIELDS if k.startswith("avg_w_actor_")):
+        for key in (k for k in self.EXTRA_FIELDS if k.startswith("avg_w_actor_") or k.startswith("avg_w_critic_")):
             row[key] = round(stats.get(key, 0.0), 6)
         return row

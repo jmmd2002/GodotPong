@@ -20,13 +20,13 @@ actions:
 
 # Learning hyperparameters
 hyperparameters:
-  alpha_actor:  0.0003
+  alpha_actor:  0.0001
   alpha_critic: 0.001
   gamma:        0.99
   actor_hidden_sizes:  [64, 64]
   critic_hidden_sizes: [128, 64]
   entropy_coef: 0.01
-  critic_coef:  0.5
+  critic_coef:  0.01
 
 # Model persistence settings
 model:
@@ -34,7 +34,7 @@ model:
   load_on_start: true
   save_on_exit: true
   autosave_every_n_steps: 100
-  num_workers: 2
+  num_workers: 100
 
 # Logging / monitoring settings
 logs:
@@ -42,5 +42,5 @@ logs:
   log_every_n_steps: 100
   log_dir: logs
   reward_window: 20
-  plot_enabled: false
+  plot_enabled: true
   plot_refresh_interval: 5.0

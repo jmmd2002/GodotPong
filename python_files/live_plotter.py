@@ -386,11 +386,17 @@ class PolicyGradientDNNLivePlotter(Plotter):
          ax_entropy, ax_grad,
          ax_ratio,  ax_dead) = axes.flatten()
 
+        # Create twin axes once here — creating them inside _redraw on every
+        # refresh would stack new axes on top of old ones, causing the
+        # "two layers overlapping" artefact.
+        ax_kl      = ax_entropy.twinx()
+        ax_ratio_r = ax_ratio.twinx()
+
         plt.show(block=False)
 
         while not shutdown_event.is_set():
             try:
-                self._redraw(fig, ax_reward, ax_loss, ax_entropy, ax_grad, ax_ratio, ax_dead)
+                self._redraw(fig, ax_reward, ax_loss, ax_entropy, ax_kl, ax_grad, ax_ratio, ax_ratio_r, ax_dead)
             except Exception as e:
                 print(f"[PolicyGradientDNNLivePlotter] Draw error: {e}")
 
@@ -407,8 +413,10 @@ class PolicyGradientDNNLivePlotter(Plotter):
         ax_reward:  plt.Axes,
         ax_loss:    plt.Axes,
         ax_entropy: plt.Axes,
+        ax_kl:      plt.Axes,
         ax_grad:    plt.Axes,
         ax_ratio:   plt.Axes,
+        ax_ratio_r: plt.Axes,
         ax_dead:    plt.Axes,
     ) -> None:
         """Pull latest data from the logger and redraw all six subplots."""
@@ -467,7 +475,6 @@ class PolicyGradientDNNLivePlotter(Plotter):
         #    KL ≈ 0 every episode = updates too small to matter.
         # ----------------------------------------------------------------
         ax_entropy.cla()
-        ax_kl = ax_entropy.twinx()
         ax_kl.cla()
         _style(ax_entropy,
                f"Entropy  +  KL Divergence (per episode)",
@@ -501,13 +508,15 @@ class PolicyGradientDNNLivePlotter(Plotter):
 
         # ----------------------------------------------------------------
         # 5. Update ratios  α‖∇W_i‖ / ‖W_i‖  (Karpathy rule-of-thumb ≈ 1e-3)
-        #    Too low (< 1e-4): weights barely moving — learning is stalled.
-        #    Too high (> 1e-2): updates too large — risk of instability.
+        #    Left axis: update ratios — healthy ≈ 1e-3.
+        #    Right axis: per-layer mean |W| — tracks weight magnitude growth.
         # ----------------------------------------------------------------
-        ratio_keys = sorted(k for k in w0_rows[0] if k.startswith("update_ratio_"))
+        ratio_keys     = sorted(k for k in w0_rows[0] if k.startswith("update_ratio_"))
+        layer_w_keys   = sorted(k for k in w0_rows[0] if k.startswith("avg_w_"))
         ax_ratio.cla()
+        ax_ratio_r.cla()
         _style(ax_ratio,
-               "Update Ratios  α‖∇W_i‖ / ‖W_i‖   (healthy ≈ 1e-3)",
+               "Update Ratios  α‖∇W_i‖ / ‖W_i‖  (≈ 1e-3)  /  Per-Layer |W|",
                "Step", "α‖∇W‖ / ‖W‖")
         num_rl = len(ratio_keys)
         for i, key in enumerate(ratio_keys):
@@ -518,7 +527,18 @@ class PolicyGradientDNNLivePlotter(Plotter):
         if ratio_keys:
             ax_ratio.axhline(y=1e-3, color="dimgray", linestyle=":", linewidth=1.2,
                              label="target  1e-3")
-            ax_ratio.legend(fontsize=LEGEND_FS)
+        ax_ratio_r.set_ylabel("|W|", fontsize=LABEL_FS)
+        ax_ratio_r.tick_params(labelsize=TICK_FS)
+        num_wl = len(layer_w_keys)
+        for i, key in enumerate(layer_w_keys):
+            suffix = key.replace("avg_w_", "")
+            label  = f"|W{suffix}| (out)" if i == num_wl - 1 else f"|W{suffix}|"
+            ax_ratio_r.plot(steps, [r.get(key, 0.0) for r in w0_rows],
+                            color=colors[i % len(colors)],
+                            linewidth=LW * 0.8, linestyle="--", label=label)
+        h_l, lb_l = ax_ratio.get_legend_handles_labels()
+        h_r, lb_r = ax_ratio_r.get_legend_handles_labels()
+        ax_ratio.legend(h_l + h_r, lb_l + lb_r, fontsize=LEGEND_FS)
 
         # ----------------------------------------------------------------
         # 6. Dead ReLU %
@@ -544,12 +564,13 @@ class A2CLivePlotter(Plotter):
     """
     Live plot window for the Advantage Actor-Critic (A2C) agent.
 
-    Four subplots:
+    Six subplots (3 × 2):
         1. Avg reward (pooled, window=N episodes) over steps
         2. Actor loss (left axis) + Critic loss (right twin axis) over steps
         3. Policy entropy (left axis) + Mean |advantage| (right twin axis) over steps
-        4. Per-layer actor mean |W| (left axis) + Actor & critic grad norms
-           (right twin axis) over steps
+        4. Per-layer actor gradient norms  ‖∇W_i‖ over steps
+        5. Per-layer actor update ratios   α‖∇W_i‖/‖W_i‖  (healthy ≈ 1e-3)
+        6. Dead ReLU % in actor hidden layers  (warning threshold at 30 %)
 
     Args:
         logger:           An A2CStatsLogger instance to read from.
@@ -576,45 +597,30 @@ class A2CLivePlotter(Plotter):
 
     def _run(self, shutdown_event: threading.Event) -> None:
         plt.ion()
-        fig, axes = plt.subplots(2, 2, figsize=(12, 7))
-        fig.suptitle("A2C Training Progress", fontsize=13)
-        fig.tight_layout(pad=3.0)
+        fig, axes = plt.subplots(3, 2, figsize=(20, 15))
+        fig.suptitle("A2C Training Progress", fontsize=18, fontweight="bold")
+        fig.tight_layout(pad=4.5)
 
-        ax_reward, ax_loss, ax_entropy, ax_weights = axes.flatten()
+        (ax_reward, ax_loss,
+         ax_entropy, ax_grad,
+         ax_ratio,  ax_dead) = axes.flatten()
 
-        ax_reward.set_title("Avg Reward (pooled)")
-        ax_reward.set_xlabel("Step")
-        ax_reward.set_ylabel("Reward")
-
-        ax_loss.set_title("Actor Loss / Critic Loss")
-        ax_loss.set_xlabel("Step")
-        ax_loss.set_ylabel("Actor Loss")
-        ax_loss_r = ax_loss.twinx()
-        ax_loss_r.set_ylabel("Critic Loss")
-
-        ax_entropy.set_title("Entropy / Mean |Advantage|")
-        ax_entropy.set_xlabel("Step")
-        ax_entropy.set_ylabel("Entropy")
+        # Create twin axes once — creating them inside _redraw on every
+        # refresh stacks new axes on top of old ones, causing overlap.
+        ax_loss_r    = ax_loss.twinx()
         ax_entropy_r = ax_entropy.twinx()
-        ax_entropy_r.set_ylabel("Mean |Advantage|")
-
-        ax_weights.set_title("Per-Layer Actor |w| / Grad Norms")
-        ax_weights.set_xlabel("Step")
-        ax_weights.set_ylabel("|w|")
-        ax_weights_r = ax_weights.twinx()
-        ax_weights_r.set_ylabel("Grad Norm")
+        ax_ratio_r   = ax_ratio.twinx()
 
         plt.show(block=False)
 
         while not shutdown_event.is_set():
             try:
-                self._redraw(
-                    fig,
-                    ax_reward,
-                    ax_loss,    ax_loss_r,
-                    ax_entropy, ax_entropy_r,
-                    ax_weights, ax_weights_r,
-                )
+                self._redraw(fig, ax_reward,
+                             ax_loss, ax_loss_r,
+                             ax_entropy, ax_entropy_r,
+                             ax_grad,
+                             ax_ratio, ax_ratio_r,
+                             ax_dead)
             except Exception as e:
                 print(f"[A2CLivePlotter] Draw error: {e}")
 
@@ -633,10 +639,18 @@ class A2CLivePlotter(Plotter):
         ax_loss_r:    plt.Axes,
         ax_entropy:   plt.Axes,
         ax_entropy_r: plt.Axes,
-        ax_weights:   plt.Axes,
-        ax_weights_r: plt.Axes,
+        ax_grad:      plt.Axes,
+        ax_ratio:     plt.Axes,
+        ax_ratio_r:   plt.Axes,
+        ax_dead:      plt.Axes,
     ) -> None:
-        """Pull latest data from the logger and redraw all subplots."""
+        """Pull latest data from the logger and redraw all six subplots."""
+        TITLE_FS  = 14
+        LABEL_FS  = 12
+        LEGEND_FS = 12
+        TICK_FS   = 11
+        LW        = 1.8
+
         with self._logger._lock:
             snapshot = list(self._logger._buffer)
 
@@ -651,85 +665,136 @@ class A2CLivePlotter(Plotter):
         if len(w0_rows) < 2:
             return
 
-        steps = [r["step"] for r in w0_rows]
+        steps  = [r["step"] for r in w0_rows]
+        colors = plt.cm.tab10.colors
 
-        # --- 1. Avg reward ---
+        def _style(ax: plt.Axes, title: str, xlabel: str, ylabel: str) -> None:
+            ax.set_title(title, fontsize=TITLE_FS, fontweight="bold")
+            ax.set_xlabel(xlabel, fontsize=LABEL_FS)
+            ax.set_ylabel(ylabel, fontsize=LABEL_FS)
+            ax.tick_params(labelsize=TICK_FS)
+
+        # ----------------------------------------------------------------
+        # 1. Avg reward
+        # ----------------------------------------------------------------
         ax_reward.cla()
-        ax_reward.set_title(f"Avg Reward (pooled, window={self._reward_window} eps)")
-        ax_reward.set_xlabel("Step")
-        ax_reward.set_ylabel("Reward")
-        ax_reward.plot(steps, [r["avg_reward"] for r in w0_rows], color="tab:blue")
+        _style(ax_reward,
+               f"Avg Reward  (window = {self._reward_window} eps)",
+               "Step", "Reward")
+        ax_reward.plot(steps, [r["avg_reward"] for r in w0_rows],
+                       color="tab:blue", linewidth=LW)
 
-        # --- 2. Actor loss (left) + Critic loss (right) ---
-        # Critic loss is typically much larger early in training (V(s) is far
-        # from G_t), so twin axes let both signals remain visible.
+        # ----------------------------------------------------------------
+        # 2. Actor loss (left) + Critic loss (right)
+        #    Critic loss is typically much larger early in training (V(s) is far
+        #    from G_t), so twin axes keep both signals visible.
+        # ----------------------------------------------------------------
         ax_loss.cla()
         ax_loss_r.cla()
-        ax_loss.set_title(f"Avg Actor Loss / Avg Critic Loss (window={self._reward_window})")
-        ax_loss.set_xlabel("Step")
-        ax_loss.set_ylabel("Actor Loss")
-        ax_loss.plot(
-            steps, [r.get("avg_actor_loss", 0.0) for r in w0_rows],
-            color="tab:red", label="actor loss",
-        )
-        ax_loss_r.set_ylabel("Critic Loss")
-        ax_loss_r.plot(
-            steps, [r.get("avg_critic_loss", 0.0) for r in w0_rows],
-            color="tab:purple", linewidth=0.8, label="critic loss",
-        )
-        handles_l, labels_l = ax_loss.get_legend_handles_labels()
-        handles_r, labels_r = ax_loss_r.get_legend_handles_labels()
-        ax_loss.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+        _style(ax_loss,
+               f"Avg Actor Loss / Avg Critic Loss  (window = {self._reward_window})",
+               "Step", "Actor Loss")
+        ax_loss.plot(steps, [r.get("avg_actor_loss",  0.0) for r in w0_rows],
+                     color="tab:red", linewidth=LW, label="actor loss")
+        ax_loss_r.set_ylabel("Critic Loss", fontsize=LABEL_FS)
+        ax_loss_r.tick_params(labelsize=TICK_FS)
+        ax_loss_r.plot(steps, [r.get("avg_critic_loss", 0.0) for r in w0_rows],
+                       color="tab:purple", linewidth=LW * 0.8, label="critic loss")
+        h_l, lb_l = ax_loss.get_legend_handles_labels()
+        h_r, lb_r = ax_loss_r.get_legend_handles_labels()
+        ax_loss.legend(h_l + h_r, lb_l + lb_r, fontsize=LEGEND_FS)
 
-        # --- 3. Entropy (left) + Mean |advantage| (right) ---
-        # A shrinking mean |A_t| alongside falling entropy confirms V(s) is
-        # converging and the policy is specialising correctly.
+        # ----------------------------------------------------------------
+        # 3. Entropy (left) + Mean |advantage| (right)
+        #    A shrinking mean |A_t| alongside falling entropy confirms
+        #    V(s) is converging and the policy is specialising correctly.
+        # ----------------------------------------------------------------
         ax_entropy.cla()
         ax_entropy_r.cla()
-        ax_entropy.set_title(f"Avg Entropy / Mean |Advantage| (window={self._reward_window})")
-        ax_entropy.set_xlabel("Step")
-        ax_entropy.set_ylabel("Entropy")
-        ax_entropy.plot(
-            steps, [r.get("avg_entropy", 0.0) for r in w0_rows],
-            color="tab:orange", label="entropy",
-        )
-        ax_entropy_r.set_ylabel("Mean |Advantage|")
-        ax_entropy_r.plot(
-            steps, [r.get("mean_advantage", 0.0) for r in w0_rows],
-            color="tab:green", linewidth=0.8, label="mean |A|",
-        )
-        handles_l, labels_l = ax_entropy.get_legend_handles_labels()
-        handles_r, labels_r = ax_entropy_r.get_legend_handles_labels()
-        ax_entropy.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+        _style(ax_entropy,
+               f"Avg Entropy / Mean |Advantage|  (window = {self._reward_window})",
+               "Step", "Entropy  H(π)")
+        ax_entropy.plot(steps, [r.get("avg_entropy",    0.0) for r in w0_rows],
+                        color="tab:orange", linewidth=LW, label="entropy H(π)")
+        ax_entropy_r.set_ylabel("Mean |Advantage|", fontsize=LABEL_FS)
+        ax_entropy_r.tick_params(labelsize=TICK_FS)
+        ax_entropy_r.plot(steps, [r.get("mean_advantage", 0.0) for r in w0_rows],
+                          color="tab:green", linewidth=LW * 0.8, label="mean |A|")
+        h_l, lb_l = ax_entropy.get_legend_handles_labels()
+        h_r, lb_r = ax_entropy_r.get_legend_handles_labels()
+        ax_entropy.legend(h_l + h_r, lb_l + lb_r, fontsize=LEGEND_FS)
 
-        # --- 4. Per-layer actor |W| (left) + actor & critic grad norms (right) ---
-        layer_keys   = sorted(k for k in w0_rows[0] if k.startswith("avg_w_actor_"))
-        actor_gnorm  = [r.get("actor_grad_norm",  0.0) for r in w0_rows]
-        critic_gnorm = [r.get("critic_grad_norm", 0.0) for r in w0_rows]
+        # ----------------------------------------------------------------
+        # 4. Per-layer actor gradient norms  ‖∇W_i‖
+        #    Vanishing: early-layer norms near zero while last layer is large.
+        #    Exploding: any layer norm spikes.
+        # ----------------------------------------------------------------
+        grad_keys = sorted(k for k in w0_rows[0] if k.startswith("grad_norm_actor_"))
+        ax_grad.cla()
+        _style(ax_grad, "Per-Layer Actor Gradient Norms  ‖∇W_i‖", "Step", "‖∇W_i‖")
+        num_gl = len(grad_keys)
+        for i, key in enumerate(grad_keys):
+            suffix = key.replace("grad_norm_actor_", "")
+            label  = f"W{suffix} (output)" if i == num_gl - 1 else f"W{suffix}"
+            ax_grad.plot(steps, [r.get(key, 0.0) for r in w0_rows],
+                         color=colors[i % len(colors)], linewidth=LW, label=label)
+        # Also overlay the combined critic grad norm as a reference.
+        ax_grad.plot(steps, [r.get("critic_grad_norm", 0.0) for r in w0_rows],
+                     color="dimgray", linewidth=1.0, linestyle=":", label="critic ‖∇‖")
+        if grad_keys or True:
+            ax_grad.legend(fontsize=LEGEND_FS)
 
-        ax_weights.cla()
-        ax_weights_r.cla()
-        ax_weights.set_title("Per-Layer Actor |w| / Grad Norms")
-        ax_weights.set_xlabel("Step")
-        ax_weights.set_ylabel("|w|")
-        colors = plt.cm.tab10.colors
-        num_layers = len(layer_keys)
-        for i, key in enumerate(layer_keys):
-            label = f"W{i} (out)" if i == num_layers - 1 else f"W{i}"
-            ax_weights.plot(
-                steps, [r.get(key, 0.0) for r in w0_rows],
-                color=colors[i % len(colors)], label=label,
-            )
-        ax_weights_r.set_ylabel("Grad Norm")
-        ax_weights_r.plot(steps, actor_gnorm,  color="tab:red",    linewidth=0.8, label="actor ‖∇‖")
-        ax_weights_r.plot(steps, critic_gnorm, color="tab:purple", linewidth=0.8,
-                          linestyle="--", label="critic ‖∇‖")
+        # ----------------------------------------------------------------
+        # 5. Actor update ratios α‖∇W_i‖/‖W_i‖ (left) + Critic |W| (right)
+        #    Left: actor update ratios — healthy ≈ 1e-3 (Karpathy rule-of-thumb).
+        #    Right: per-layer critic mean |W| —tracks how critic weights evolve.
+        # ----------------------------------------------------------------
+        ratio_keys       = sorted(k for k in w0_rows[0] if k.startswith("update_ratio_actor_"))
+        critic_layer_keys = sorted(k for k in w0_rows[0] if k.startswith("avg_w_critic_"))
+        ax_ratio.cla()
+        ax_ratio_r.cla()
+        _style(ax_ratio,
+               "Actor Update Ratios  α‖∇W_i‖/‖W_i‖  (≈ 1e-3)  /  Critic |W|",
+               "Step", "α‖∇W‖ / ‖W‖")
+        num_rl = len(ratio_keys)
+        for i, key in enumerate(ratio_keys):
+            suffix = key.replace("update_ratio_actor_", "")
+            label  = f"W{suffix} (output)" if i == num_rl - 1 else f"W{suffix}"
+            ax_ratio.plot(steps, [r.get(key, 0.0) for r in w0_rows],
+                          color=colors[i % len(colors)], linewidth=LW, label=label)
+        if ratio_keys:
+            ax_ratio.axhline(y=1e-3, color="dimgray", linestyle=":", linewidth=1.2,
+                             label="target  1e-3")
+        ax_ratio_r.set_ylabel("Critic  |W|", fontsize=LABEL_FS)
+        ax_ratio_r.tick_params(labelsize=TICK_FS)
+        num_cl = len(critic_layer_keys)
+        for i, key in enumerate(critic_layer_keys):
+            suffix = key.replace("avg_w_critic_", "")
+            label  = f"critic W{suffix} (out)" if i == num_cl - 1 else f"critic W{suffix}"
+            ax_ratio_r.plot(steps, [r.get(key, 0.0) for r in w0_rows],
+                            color=colors[(i + 5) % len(colors)],
+                            linewidth=LW * 0.8, linestyle="--", label=label)
+        h_l, lb_l = ax_ratio.get_legend_handles_labels()
+        h_r, lb_r = ax_ratio_r.get_legend_handles_labels()
+        ax_ratio.legend(h_l + h_r, lb_l + lb_r, fontsize=LEGEND_FS)
 
-        handles_l, labels_l = ax_weights.get_legend_handles_labels()
-        handles_r, labels_r = ax_weights_r.get_legend_handles_labels()
-        ax_weights.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
+        # ----------------------------------------------------------------
+        # 6. Dead ReLU % (actor hidden layers)
+        #    > 30 %: significant capacity loss — consider lower learning rate
+        #            or weight re-initialisation.
+        # ----------------------------------------------------------------
+        ax_dead.cla()
+        _style(ax_dead,
+               "Dead ReLU %  (random 100-sample batch, actor hidden layers)",
+               "Step", "Dead activations %")
+        ax_dead.plot(steps, [r.get("dead_relu_pct", 0.0) for r in w0_rows],
+                     color="tab:brown", linewidth=LW, label="Dead ReLU %")
+        ax_dead.set_ylim(0, 100)
+        ax_dead.axhline(y=30, color="tab:red", linestyle="--", linewidth=1.2,
+                        label="30 % warning")
+        ax_dead.legend(fontsize=LEGEND_FS)
 
-        fig.tight_layout(pad=3.0)
+        fig.tight_layout(pad=4.5)
         fig.canvas.draw_idle()
 
 
@@ -903,23 +968,31 @@ class PPOLivePlotter(Plotter):
         handles_r, labels_r = ax_ppo_r.get_legend_handles_labels()
         ax_ppo.legend(handles_l + handles_r, labels_l + labels_r, fontsize=8)
 
-        # --- 4. Per-layer actor |W| + grad norms ---
-        layer_keys   = sorted(k for k in w0_rows[0] if k.startswith("avg_w_actor_"))
+        # --- 4. Per-layer actor |W| (solid) + critic |W| (dashed) + grad norms ---
+        actor_layer_keys  = sorted(k for k in w0_rows[0] if k.startswith("avg_w_actor_"))
+        critic_layer_keys = sorted(k for k in w0_rows[0] if k.startswith("avg_w_critic_"))
         actor_gnorm  = [r.get("actor_grad_norm",  0.0) for r in w0_rows]
         critic_gnorm = [r.get("critic_grad_norm", 0.0) for r in w0_rows]
 
         ax_weights.cla()
         ax_weights_r.cla()
-        ax_weights.set_title("Per-Layer Actor |w| / Grad Norms")
+        ax_weights.set_title("Per-Layer Actor |w| (solid) / Critic |w| (dashed) / Grad Norms")
         ax_weights.set_xlabel("Step")
         ax_weights.set_ylabel("|w|")
         colors = plt.cm.tab10.colors
-        num_layers = len(layer_keys)
-        for i, key in enumerate(layer_keys):
-            label = f"W{i} (out)" if i == num_layers - 1 else f"W{i}"
+        num_actor_layers = len(actor_layer_keys)
+        for i, key in enumerate(actor_layer_keys):
+            label = f"actor W{i} (out)" if i == num_actor_layers - 1 else f"actor W{i}"
             ax_weights.plot(
                 steps, [r.get(key, 0.0) for r in w0_rows],
                 color=colors[i % len(colors)], label=label,
+            )
+        num_critic_layers = len(critic_layer_keys)
+        for i, key in enumerate(critic_layer_keys):
+            label = f"critic W{i} (out)" if i == num_critic_layers - 1 else f"critic W{i}"
+            ax_weights.plot(
+                steps, [r.get(key, 0.0) for r in w0_rows],
+                color=colors[i % len(colors)], linewidth=0.9, linestyle="--", label=label,
             )
         ax_weights_r.set_ylabel("Grad Norm")
         ax_weights_r.plot(steps, actor_gnorm,  color="tab:red",    linewidth=0.8, label="actor ‖∇‖")

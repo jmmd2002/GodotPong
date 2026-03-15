@@ -14,7 +14,7 @@ from policy_gradient_DNN_agent import PolicyGradientDNNAgent
 import yaml
 
 # ── Configuration ────────────────────────────────────────────────────────────
-AGENT        = "coach"   # "coach" or "student"
+AGENT        = "student"   # "coach" or "student"
 CONFIG_PATH  = Path(__file__).parent.parent / "config" / f"PolicyGradientDNN_{AGENT}.yaml"
 OUTPUT_PATH  = Path(__file__).parent.parent.parent / "godot_files" / "models" / f"policy_dnn_{AGENT}.json"
 # ─────────────────────────────────────────────────────────────────────────────

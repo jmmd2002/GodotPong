@@ -425,7 +425,7 @@ def worker(worker_id: int, agent: RLAgent, model_path: Path,
 def main():
     """Start all workers and wait for Ctrl+C."""
     training_method, training_mode = receive_handshake()
-    training_method = "policy_gradient_dnn"  #for headless training
+    training_method = "a2c"  #for headless training
     training_mode = "vs_coach" #for headless training
     agent, config = load_agent(training_method, training_mode)
 

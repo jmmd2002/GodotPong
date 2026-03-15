@@ -338,10 +338,14 @@ class A2CAgent(RLAgent):
         self._last_critic_loss     = 0.0  # critic loss from the most recent episode
         self._last_episode_return  = 0.0  # Σ r_t of the most recent episode
         self._last_episode_length  = 0    # T of the most recent episode
-        self._last_actor_grad_norm = 0.0  # ‖∇θ L_actor‖ at last update
-        self._last_critic_grad_norm= 0.0  # ‖∇w L_critic‖ at last update
-        self._last_entropy         = 0.0  # H(π) at zero state, cached after update
-        self._last_mean_advantage  = 0.0  # mean |A_t| at last update (quality signal)
+        self._last_actor_grad_norm           = 0.0   # ‖∇θ L_actor‖ at last update
+        self._last_critic_grad_norm          = 0.0   # ‖∇w L_critic‖ at last update
+        self._last_entropy                   = 0.0   # H(π) at zero state, cached after update
+        self._last_mean_advantage            = 0.0   # mean |A_t| at last update (quality signal)
+        self._last_kl                        = 0.0   # KL divergence of actor policy at zero state
+        self._last_dead_relu                 = 0.0   # % dead ReLU in actor hidden layers
+        self._last_actor_layer_grad_norms:    list  = []  # per-layer actor ‖∇W_i‖
+        self._last_actor_layer_update_ratios: list  = []  # per-layer α‖∇W_i‖/‖W_i‖
 
     # ------------------------------------------------------------------
     # Parameter initialisation
@@ -1067,6 +1071,11 @@ class A2CAgent(RLAgent):
         #
         # L_actor = −mean(Â_t · log π(a_t|s_t)) − c_H · H(π)
         # θ ← θ − α_actor · ∇θ L_actor
+
+        # Policy at zero state BEFORE the update — used to compute KL divergence.
+        s_zero    = jnp.zeros(self.state_dim)
+        pi_before = np.array(self._actor_forward_jit(self.actor_params, s_zero))
+
         actor_loss, actor_grads = self._actor_loss_and_grad_jit(
             self.actor_params, states_arr, action_ids_arr,
             norm_advantages, self.entropy_coef
@@ -1074,6 +1083,17 @@ class A2CAgent(RLAgent):
         actor_grad_norm = float(
             jnp.sqrt(sum(jnp.sum(g ** 2) for g in jax.tree.leaves(actor_grads)))
         )
+
+        # Per-layer actor gradient norms and update ratios (before lock — params unchanged).
+        actor_w_keys = sorted(k for k in self.actor_params if k.startswith("W"))
+        actor_layer_grad_norms:    list[float] = []
+        actor_layer_update_ratios: list[float] = []
+        for _key in actor_w_keys:
+            _g_norm = float(jnp.sqrt(jnp.sum(actor_grads[_key] ** 2)))
+            _w_norm = float(jnp.sqrt(jnp.sum(self.actor_params[_key] ** 2)))
+            actor_layer_grad_norms.append(_g_norm)
+            actor_layer_update_ratios.append(self.alpha_actor * _g_norm / (_w_norm + 1e-8))
+        
 
         # ── step 6: critic update ─────────────────────────────────────────
         #
@@ -1099,21 +1119,40 @@ class A2CAgent(RLAgent):
                 lambda p, g: p - self.alpha_critic * g,
                 self.critic_params, critic_grads,
             )
-            self._episodes_completed    += 1
-            self._updates_count         += len(rewards)
-            self._last_actor_loss        = float(actor_loss)
-            self._last_critic_loss       = float(critic_loss)
-            self._last_episode_return    = float(sum(rewards))
-            self._last_episode_length    = len(rewards)
-            self._last_actor_grad_norm   = actor_grad_norm
-            self._last_critic_grad_norm  = critic_grad_norm
-            self._last_mean_advantage    = float(jnp.mean(jnp.abs(advantages)))
+            self._episodes_completed             += 1
+            self._updates_count                  += len(rewards)
+            self._last_actor_loss                 = float(actor_loss)
+            self._last_critic_loss                = float(critic_loss)
+            self._last_episode_return             = float(sum(rewards))
+            self._last_episode_length             = len(rewards)
+            self._last_actor_grad_norm            = actor_grad_norm
+            self._last_critic_grad_norm           = critic_grad_norm
+            self._last_mean_advantage             = float(jnp.mean(jnp.abs(advantages)))
+            self._last_actor_layer_grad_norms     = actor_layer_grad_norms
+            self._last_actor_layer_update_ratios  = actor_layer_update_ratios
 
-            # Cache entropy at zero state — cheap after JIT warmup.
-            s_zero  = jnp.zeros(self.state_dim)
-            pi_zero = np.array(self._actor_forward_jit(self.actor_params, s_zero))
+            # KL divergence and entropy at zero state after the actor update.
+            pi_after = np.array(self._actor_forward_jit(self.actor_params, s_zero))
             self._last_entropy = float(
-                -np.sum(pi_zero * np.log(np.clip(pi_zero, 1e-8, 1.0)))
+                -np.sum(pi_after * np.log(np.clip(pi_after, 1e-8, 1.0)))
+            )
+            self._last_kl = float(
+                np.sum(pi_before * np.log((pi_before + 1e-8) / (pi_after + 1e-8)))
+            )
+
+            # Dead ReLU %: fraction of actor hidden activations = 0 on a random batch.
+            _x = np.random.uniform(-1.0, 1.0, (100, self.state_dim)).astype(np.float32)
+            _total_acts = 0
+            _dead_acts  = 0
+            for _i in range(len(self.actor_hidden_sizes)):
+                _x = np.maximum(
+                    0.0,
+                    _x @ np.array(self.actor_params[f"W{_i}"]).T + np.array(self.actor_params[f"b{_i}"]),
+                )
+                _dead_acts  += int(np.sum(_x == 0.0))
+                _total_acts += int(_x.size)
+            self._last_dead_relu = (
+                100.0 * _dead_acts / _total_acts if _total_acts > 0 else 0.0
             )
 
     def save(self, filepath: str) -> None:
@@ -1294,37 +1333,45 @@ class A2CAgent(RLAgent):
         avg_w_actor_1, … so the stats logger can log them as extra columns.
 
         Returns:
-            episodes          — total episodes that triggered a gradient update
-            updates           — total timesteps processed across all episodes
-            actor_loss        — actor loss from the most recent episode
-            critic_loss       — critic loss from the most recent episode
-            episode_return    — sum of rewards in the last finished episode
-            episode_length    — number of steps in the last finished episode
-            mean_advantage    — mean |A_t| at the last update
-            avg_entropy       — H(π) at zero state (cached from last gradient step)
-            actor_grad_norm   — L2 norm of the actor gradient at last update
-            critic_grad_norm  — L2 norm of the critic gradient at last update
-            actor_avg_w       — mean |weight| across all actor W matrices
-            actor_max_w       — max |weight| across all actor W matrices
-            actor_std_w       — std of all actor weights
-            critic_avg_w      — mean |weight| across all critic W matrices
-            critic_max_w      — max |weight| across all critic W matrices
-            critic_std_w      — std of all critic weights
-            avg_w_actor_N     — mean |weight| of actor layer N (for each layer)
+            episodes               — total episodes that triggered a gradient update
+            updates                — total timesteps processed across all episodes
+            actor_loss             — actor loss from the most recent episode
+            critic_loss            — critic loss from the most recent episode
+            episode_return         — sum of rewards in the last finished episode
+            episode_length         — number of steps in the last finished episode
+            mean_advantage         — mean |A_t| at the last update
+            avg_entropy            — H(π) at zero state (cached from last gradient step)
+            actor_grad_norm        — L2 norm of the actor gradient at last update
+            critic_grad_norm       — L2 norm of the critic gradient at last update
+            kl_div                 — KL divergence of actor policy before vs after last update
+            dead_relu_pct          — % of dead ReLU activations in actor hidden layers
+            actor_avg_w            — mean |weight| across all actor W matrices
+            actor_max_w            — max |weight| across all actor W matrices
+            actor_std_w            — std of all actor weights
+            critic_avg_w           — mean |weight| across all critic W matrices
+            critic_max_w           — max |weight| across all critic W matrices
+            critic_std_w           — std of all critic weights
+            avg_w_actor_N          — mean |weight| of actor layer N (for each layer)
+            grad_norm_actor_N      — per-layer L2 gradient norm of actor layer N
+            update_ratio_actor_N   — α‖∇W_i‖/‖W_i‖ of actor layer N (healthy ≈ 1e-3)
         """
         with self._lock:
-            actor_snap             = {k: np.array(v) for k, v in self.actor_params.items()}
-            critic_snap            = {k: np.array(v) for k, v in self.critic_params.items()}
-            episodes_completed     = self._episodes_completed
-            updates_count          = self._updates_count
-            last_actor_loss        = self._last_actor_loss
-            last_critic_loss       = self._last_critic_loss
-            last_episode_return    = self._last_episode_return
-            last_episode_length    = self._last_episode_length
-            last_actor_grad_norm   = self._last_actor_grad_norm
-            last_critic_grad_norm  = self._last_critic_grad_norm
-            last_entropy           = self._last_entropy
-            last_mean_advantage    = self._last_mean_advantage
+            actor_snap                        = {k: np.array(v) for k, v in self.actor_params.items()}
+            critic_snap                       = {k: np.array(v) for k, v in self.critic_params.items()}
+            episodes_completed                = self._episodes_completed
+            updates_count                     = self._updates_count
+            last_actor_loss                   = self._last_actor_loss
+            last_critic_loss                  = self._last_critic_loss
+            last_episode_return               = self._last_episode_return
+            last_episode_length               = self._last_episode_length
+            last_actor_grad_norm              = self._last_actor_grad_norm
+            last_critic_grad_norm             = self._last_critic_grad_norm
+            last_entropy                      = self._last_entropy
+            last_mean_advantage               = self._last_mean_advantage
+            last_kl                           = self._last_kl
+            last_dead_relu                    = self._last_dead_relu
+            last_actor_layer_grad_norms       = list(self._last_actor_layer_grad_norms)
+            last_actor_layer_update_ratios    = list(self._last_actor_layer_update_ratios)
 
         # Actor weight stats (W matrices only)
         actor_w_keys   = sorted(k for k in actor_snap  if k.startswith("W"))
@@ -1346,6 +1393,21 @@ class A2CAgent(RLAgent):
             for i, k in enumerate(actor_w_keys)
         }
 
+        # Per-layer critic mean |W| — keyed as avg_w_critic_0, avg_w_critic_1, …
+        per_layer_critic_avg_w = {
+            f"avg_w_critic_{i}": round(float(np.abs(critic_snap[k]).mean()), 6)
+            for i, k in enumerate(critic_w_keys)
+        }
+
+        per_layer_actor_grad_norms = {
+            f"grad_norm_actor_{i}": round(v, 6)
+            for i, v in enumerate(last_actor_layer_grad_norms)
+        }
+        per_layer_actor_update_ratios = {
+            f"update_ratio_actor_{i}": round(v, 8)
+            for i, v in enumerate(last_actor_layer_update_ratios)
+        }
+
         return {
             "episodes":          episodes_completed,
             "updates":           updates_count,
@@ -1357,6 +1419,8 @@ class A2CAgent(RLAgent):
             "avg_entropy":       round(last_entropy,          6),
             "actor_grad_norm":   round(last_actor_grad_norm,  6),
             "critic_grad_norm":  round(last_critic_grad_norm, 6),
+            "kl_div":            round(last_kl,               8),
+            "dead_relu_pct":     round(last_dead_relu,        4),
             "actor_avg_w":       round(actor_avg_w,           6),
             "actor_max_w":       round(actor_max_w,           6),
             "actor_std_w":       round(actor_std_w,           6),
@@ -1364,6 +1428,9 @@ class A2CAgent(RLAgent):
             "critic_max_w":      round(critic_max_w,          6),
             "critic_std_w":      round(critic_std_w,          6),
             **per_layer_actor_avg_w,
+            **per_layer_critic_avg_w,
+            **per_layer_actor_grad_norms,
+            **per_layer_actor_update_ratios,
         }
 
     def print_config(self) -> None:

@@ -1145,6 +1145,12 @@ class PPOAgent(RLAgent):
             for i, k in enumerate(actor_w_keys)
         }
 
+        # Per-layer critic mean |W| — keyed as avg_w_critic_0, avg_w_critic_1, …
+        per_layer_critic = {
+            f"avg_w_critic_{i}": round(float(np.abs(critic_snap[k]).mean()), 6)
+            for i, k in enumerate(critic_w_keys)
+        }
+
         return {
             "episodes":          episodes_completed,
             "updates":           updates_count,
@@ -1165,6 +1171,7 @@ class PPOAgent(RLAgent):
             "critic_max_w":      round(critic_max_w,           6),
             "critic_std_w":      round(critic_std_w,           6),
             **per_layer_actor,
+            **per_layer_critic,
         }
 
     # ------------------------------------------------------------------
