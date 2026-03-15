@@ -21,12 +21,12 @@ actions:
 # Learning hyperparameters
 hyperparameters:
   alpha_actor:  0.0001
-  alpha_critic: 0.001
+  alpha_critic: 0.0005
   gamma:        0.99
-  actor_hidden_sizes:  [64, 64]
+  actor_hidden_sizes:  [128, 64]
   critic_hidden_sizes: [128, 64]
-  entropy_coef: 0.01
-  critic_coef:  0.01
+  entropy_coef: 0
+  critic_coef:  0
 
 # Model persistence settings
 model:

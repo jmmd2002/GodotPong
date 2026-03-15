@@ -746,18 +746,15 @@ class A2CLivePlotter(Plotter):
 
         # ----------------------------------------------------------------
         # 5. Actor + Critic update ratios α‖∇W_i‖/‖W_i‖ (left, same axis)
-        #    + Critic |W| (right twin axis)
         #    Both update ratios share the left axis so they can be directly
         #    compared against each other and against the 1e-3 reference.
-        #    Critic |W| on the right axis tracks weight magnitude growth.
         # ----------------------------------------------------------------
         actor_ratio_keys  = sorted(k for k in w0_rows[0] if k.startswith("update_ratio_actor_"))
         critic_ratio_keys = sorted(k for k in w0_rows[0] if k.startswith("update_ratio_critic_"))
-        critic_layer_keys = sorted(k for k in w0_rows[0] if k.startswith("avg_w_critic_"))
         ax_ratio.cla()
         ax_ratio_r.cla()
         _style(ax_ratio,
-               "Actor & Critic Update Ratios  α‖∇W_i‖/‖W_i‖  (≈ 1e-3)  /  Critic |W|",
+               "Actor & Critic Update Ratios  α‖∇W_i‖/‖W_i‖  (≈ 1e-3)",
                "Step", "α‖∇W‖ / ‖W‖")
         num_arl = len(actor_ratio_keys)
         for i, key in enumerate(actor_ratio_keys):
@@ -774,18 +771,7 @@ class A2CLivePlotter(Plotter):
                           linewidth=LW, linestyle="--", label=label)
         ax_ratio.axhline(y=1e-3, color="dimgray", linestyle=":", linewidth=1.2,
                          label="target  1e-3")
-        ax_ratio_r.set_ylabel("Critic  |W|", fontsize=LABEL_FS)
-        ax_ratio_r.tick_params(labelsize=TICK_FS)
-        num_cl = len(critic_layer_keys)
-        for i, key in enumerate(critic_layer_keys):
-            suffix = key.replace("avg_w_critic_", "")
-            label  = f"|critic W{suffix}| (out)" if i == num_cl - 1 else f"|critic W{suffix}|"
-            ax_ratio_r.plot(steps, [r.get(key, 0.0) for r in w0_rows],
-                            color=colors[(i + 5) % len(colors)],
-                            linewidth=LW * 0.5, linestyle=":", label=label)
-        h_l, lb_l = ax_ratio.get_legend_handles_labels()
-        h_r, lb_r = ax_ratio_r.get_legend_handles_labels()
-        ax_ratio.legend(h_l + h_r, lb_l + lb_r, fontsize=LEGEND_FS)
+        ax_ratio.legend(fontsize=LEGEND_FS)
 
         # ----------------------------------------------------------------
         # 6. Dead ReLU % (actor hidden layers)

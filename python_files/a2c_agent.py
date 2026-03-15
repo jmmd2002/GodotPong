@@ -871,8 +871,8 @@ class A2CAgent(RLAgent):
         """Actor loss for one full episode.
 
         Definition:
-            L_actor(θ) = −(1/T) Σ_t  Â_t · log π(a_t | s_t ; θ)
-                         − c_H · (1/T) Σ_t  H(π(·|s_t ; θ))
+            L_actor(θ) = −Σ_t  Â_t · log π(a_t | s_t ; θ)
+                         − c_H · Σ_t  H(π(·|s_t ; θ))
 
         Where:
             Â_t = normalised advantage  (mean 0, std 1 within the episode)
@@ -904,7 +904,7 @@ class A2CAgent(RLAgent):
             entropy_coef: c_H — weight of the entropy bonus.
 
         Returns:
-            Scalar loss value (mean over T).
+            Scalar loss value (sum over T).
         """
         # Forward pass on all T states simultaneously.
         # vmap broadcasts actor_params (not mapped) over each row of states.
@@ -920,11 +920,11 @@ class A2CAgent(RLAgent):
 
         # Policy-gradient term: weight each log-prob by its advantage.
         # Negate because jax.grad descends and we want ascent.
-        pg_loss = -jnp.mean(advantages * log_probs)
+        pg_loss = -jnp.sum(advantages * log_probs)
 
-        # Entropy term: H(π) = −Σ_a π_a log π_a, averaged over timesteps.
-        # Summing over axis=-1 (actions), then averaging over axis=0 (time).
-        entropy = -jnp.mean(
+        # Entropy term: H(π) = −Σ_a π_a log π_a, summed over timesteps.
+        # Summing over axis=-1 (actions), then summing over axis=0 (time).
+        entropy = -jnp.sum(
             jnp.sum(all_pi * jnp.log(all_pi + 1e-8), axis=-1)
         )
 
@@ -940,9 +940,9 @@ class A2CAgent(RLAgent):
         """Critic loss for one full episode.
 
         Definition:
-            L_critic(w) = (1/T) Σ_t  (G_t − V(s_t ; w))²
+            L_critic(w) = Σ_t  (G_t − V(s_t ; w))²
 
-        This is standard Mean Squared Error (MSE) regression.
+        This is standard Sum of Squared Errors (SSE) regression.
         The critic is trained to predict the discounted return G_t
         from each visited state s_t.
 
@@ -963,14 +963,14 @@ class A2CAgent(RLAgent):
             returns:       Raw discounted returns G_t, shape (T,).
 
         Returns:
-            Scalar MSE loss (mean over T).
+            Scalar MSE loss (sum over T).
         """
         # Critic forward pass on all T states simultaneously.
         values = jax.vmap(
             lambda s: A2CAgent._forward_critic(critic_params, s)
         )(states)                                              # (T,)
 
-        return jnp.mean((returns - values) ** 2)
+        return jnp.sum((returns - values) ** 2)
 
     # ------------------------------------------------------------------
     # update — accumulate trajectory, apply both gradient updates at end
