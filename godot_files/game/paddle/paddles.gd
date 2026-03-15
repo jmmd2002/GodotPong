@@ -20,7 +20,7 @@ const PADDLE_MANUAL_B: String = "res://game/paddle/paddle_manual_b.tscn"
 
 var PADDLE_SCENES: Dictionary = {
 	"ai_training": PADDLE_AI,
-	"coach": PADDLE_POLGRADCOACH,
+	"coach": PADDLE_POLGRADDNNCOACH,
 	"Qcoach":     PADDLE_QCOACH,
 	"Qstudent":   PADDLE_QSTUDENT,
 	"PolGradcoach": PADDLE_POLGRADCOACH,
