@@ -17,7 +17,7 @@ actions:
 
 # Learning hyperparameters
 hyperparameters:
-  alpha: 0.0001      # Learning rate — smaller than linear agent; DNN gradients are denser
+  alpha: 0.00001      # Learning rate — smaller than linear agent; DNN gradients are denser
   gamma: 0.99         # Discount factor: 0 = myopic, 1 = full return
   hidden_sizes: [128, 64]   # MLP hidden layer widths: state_dim→128→64→num_actions
 
