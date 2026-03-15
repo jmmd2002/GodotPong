@@ -451,7 +451,13 @@ class A2CStatsLogger(StatsLogger):
             for key in sorted(k for k in stats if k.startswith("grad_norm_actor_")):
                 if key not in self.EXTRA_FIELDS:
                     self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("grad_norm_critic_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
             for key in sorted(k for k in stats if k.startswith("update_ratio_actor_")):
+                if key not in self.EXTRA_FIELDS:
+                    self.EXTRA_FIELDS.append(key)
+            for key in sorted(k for k in stats if k.startswith("update_ratio_critic_")):
                 if key not in self.EXTRA_FIELDS:
                     self.EXTRA_FIELDS.append(key)
             self._layer_fields_added = True
@@ -476,9 +482,9 @@ class A2CStatsLogger(StatsLogger):
             "critic_std_w":    round(stats.get("critic_std_w",      0.0), 6),
             "updates":              stats.get("updates",            0),
         }
-        for prefix in ("avg_w_actor_", "avg_w_critic_", "grad_norm_actor_", "update_ratio_actor_"):
+        for prefix in ("avg_w_actor_", "avg_w_critic_", "grad_norm_actor_", "grad_norm_critic_", "update_ratio_actor_", "update_ratio_critic_"):
             for key in (k for k in self.EXTRA_FIELDS if k.startswith(prefix)):
-                row[key] = round(stats.get(key, 0.0), 8 if prefix == "update_ratio_actor_" else 6)
+                row[key] = round(stats.get(key, 0.0), 8 if "update_ratio" in prefix else 6)
         return row
 
 

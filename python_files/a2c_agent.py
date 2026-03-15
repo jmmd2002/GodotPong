@@ -346,6 +346,8 @@ class A2CAgent(RLAgent):
         self._last_dead_relu                 = 0.0   # % dead ReLU in actor hidden layers
         self._last_actor_layer_grad_norms:    list  = []  # per-layer actor ‖∇W_i‖
         self._last_actor_layer_update_ratios: list  = []  # per-layer α‖∇W_i‖/‖W_i‖
+        self._last_critic_layer_grad_norms:   list  = []  # per-layer critic ‖∇W_i‖
+        self._last_critic_layer_update_ratios:list  = []  # per-layer α‖∇W_i‖/‖W_i‖
 
     # ------------------------------------------------------------------
     # Parameter initialisation
@@ -1105,6 +1107,16 @@ class A2CAgent(RLAgent):
         critic_grad_norm = float(
             jnp.sqrt(sum(jnp.sum(g ** 2) for g in jax.tree.leaves(critic_grads)))
         )
+
+        # Per-layer critic gradient norms and update ratios (before lock — params unchanged).
+        critic_w_keys_upd = sorted(k for k in self.critic_params if k.startswith("W"))
+        critic_layer_grad_norms:    list[float] = []
+        critic_layer_update_ratios: list[float] = []
+        for _key in critic_w_keys_upd:
+            _g_norm = float(jnp.sqrt(jnp.sum(critic_grads[_key] ** 2)))
+            _w_norm = float(jnp.sqrt(jnp.sum(self.critic_params[_key] ** 2)))
+            critic_layer_grad_norms.append(_g_norm)
+            critic_layer_update_ratios.append(self.alpha_critic * _g_norm / (_w_norm + 1e-8))
         # ── apply updates + record stats under lock ───────────────────────
         #
         # Both networks are written atomically under the same lock so save()
@@ -1130,6 +1142,8 @@ class A2CAgent(RLAgent):
             self._last_mean_advantage             = float(jnp.mean(jnp.abs(advantages)))
             self._last_actor_layer_grad_norms     = actor_layer_grad_norms
             self._last_actor_layer_update_ratios  = actor_layer_update_ratios
+            self._last_critic_layer_grad_norms    = critic_layer_grad_norms
+            self._last_critic_layer_update_ratios = critic_layer_update_ratios
 
             # KL divergence and entropy at zero state after the actor update.
             pi_after = np.array(self._actor_forward_jit(self.actor_params, s_zero))
@@ -1372,6 +1386,8 @@ class A2CAgent(RLAgent):
             last_dead_relu                    = self._last_dead_relu
             last_actor_layer_grad_norms       = list(self._last_actor_layer_grad_norms)
             last_actor_layer_update_ratios    = list(self._last_actor_layer_update_ratios)
+            last_critic_layer_grad_norms      = list(self._last_critic_layer_grad_norms)
+            last_critic_layer_update_ratios   = list(self._last_critic_layer_update_ratios)
 
         # Actor weight stats (W matrices only)
         actor_w_keys   = sorted(k for k in actor_snap  if k.startswith("W"))
@@ -1407,6 +1423,14 @@ class A2CAgent(RLAgent):
             f"update_ratio_actor_{i}": round(v, 8)
             for i, v in enumerate(last_actor_layer_update_ratios)
         }
+        per_layer_critic_grad_norms = {
+            f"grad_norm_critic_{i}": round(v, 6)
+            for i, v in enumerate(last_critic_layer_grad_norms)
+        }
+        per_layer_critic_update_ratios = {
+            f"update_ratio_critic_{i}": round(v, 8)
+            for i, v in enumerate(last_critic_layer_update_ratios)
+        }
 
         return {
             "episodes":          episodes_completed,
@@ -1431,6 +1455,8 @@ class A2CAgent(RLAgent):
             **per_layer_critic_avg_w,
             **per_layer_actor_grad_norms,
             **per_layer_actor_update_ratios,
+            **per_layer_critic_grad_norms,
+            **per_layer_critic_update_ratios,
         }
 
     def print_config(self) -> None:
